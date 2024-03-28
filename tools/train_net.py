@@ -8,7 +8,7 @@ import numpy as np
 import pprint
 import torch
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
-
+import torchmetrics
 import slowfast.models.losses as losses
 import slowfast.models.optimizer as optim
 import slowfast.utils.checkpoint as cu
@@ -74,9 +74,7 @@ def train_epoch(
     # Explicitly declare reduction to mean.
     loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
 
-    for cur_iter, (inputs, labels, index, time, meta) in enumerate(
-        train_loader
-    ):
+    for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             if isinstance(inputs, (list,)):
@@ -100,9 +98,7 @@ def train_epoch(
                     meta[key] = val.cuda(non_blocking=True)
 
         batch_size = (
-            inputs[0][0].size(0)
-            if isinstance(inputs[0], list)
-            else inputs[0].size(0)
+            inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
         )
         # Update the learning rate.
         epoch_exact = cur_epoch + float(cur_iter) / data_size
@@ -121,12 +117,7 @@ def train_epoch(
             optimizer.zero_grad()
 
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                (
-                    model,
-                    preds,
-                    partial_loss,
-                    perform_backward,
-                ) = contrastive_forward(
+                (model, preds, partial_loss, perform_backward,) = contrastive_forward(
                     model, cfg, inputs, index, time, epoch_exact, scaler
                 )
             elif cfg.DETECTION.ENABLE:
@@ -227,10 +218,12 @@ def train_epoch(
                     loss_extra = [one_loss.item() for one_loss in loss_extra]
             else:
                 # Compute the errors.
-                num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
-                top1_err, top5_err = [
-                    (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
-                ]
+                top1_err = torchmetrics.functional.accuracy(
+                    preds, labels, task="multilabel", num_labels=18, top_k=1
+                )
+                top5_err = torchmetrics.functional.accuracy(
+                    preds, labels, task="multilabel", num_labels=18, top_k=5
+                )
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
                     loss, grad_norm, top1_err, top5_err = du.all_reduce(
@@ -284,9 +277,7 @@ def train_epoch(
 
 
 @torch.no_grad()
-def eval_epoch(
-    val_loader, model, val_meter, cur_epoch, cfg, train_loader, writer
-):
+def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, writer):
     """
     Evaluate the model on the val set.
     Args:
@@ -322,9 +313,7 @@ def eval_epoch(
             index = index.cuda()
             time = time.cuda()
         batch_size = (
-            inputs[0][0].size(0)
-            if isinstance(inputs[0], list)
-            else inputs[0].size(0)
+            inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
         )
         val_meter.data_toc()
 
@@ -359,9 +348,7 @@ def eval_epoch(
                 )
                 yd, yi = model(inputs, index, time)
                 K = yi.shape[1]
-                C = (
-                    cfg.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM
-                )  # eg 400 for Kinetics400
+                C = cfg.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM  # eg 400 for Kinetics400
                 candidates = train_labels.view(1, -1).expand(batch_size, -1)
                 retrieval = torch.gather(candidates, 1, yi)
                 retrieval_one_hot = torch.zeros((batch_size * K, C)).cuda()
@@ -421,20 +408,14 @@ def eval_epoch(
     # write to tensorboard format if available.
     if writer is not None:
         if cfg.DETECTION.ENABLE:
-            writer.add_scalars(
-                {"Val/mAP": val_meter.full_map}, global_step=cur_epoch
-            )
+            writer.add_scalars({"Val/mAP": val_meter.full_map}, global_step=cur_epoch)
         else:
             all_preds = [pred.clone().detach() for pred in val_meter.all_preds]
-            all_labels = [
-                label.clone().detach() for label in val_meter.all_labels
-            ]
+            all_labels = [label.clone().detach() for label in val_meter.all_labels]
             if cfg.NUM_GPUS:
                 all_preds = [pred.cpu() for pred in all_preds]
                 all_labels = [label.cpu() for label in all_labels]
-            writer.plot_eval(
-                preds=all_preds, labels=all_labels, global_step=cur_epoch
-            )
+            writer.plot_eval(preds=all_preds, labels=all_labels, global_step=cur_epoch)
 
     val_meter.reset()
 
@@ -491,9 +472,7 @@ def build_trainer(cfg):
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
     val_loader = loader.construct_loader(cfg, "val")
-    precise_bn_loader = loader.construct_loader(
-        cfg, "train", is_precise_bn=True
-    )
+    precise_bn_loader = loader.construct_loader(cfg, "train", is_precise_bn=True)
     # Create meters.
     train_meter = TrainMeter(len(train_loader), cfg)
     val_meter = ValMeter(len(val_loader), cfg)
@@ -620,9 +599,7 @@ def train(cfg):
         val_meter = ValMeter(len(val_loader), cfg)
 
     # set up writer for logging to Tensorboard format.
-    if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
-        cfg.NUM_GPUS * cfg.NUM_SHARDS
-    ):
+    if cfg.TENSORBOARD.ENABLE and du.is_master_proc(cfg.NUM_GPUS * cfg.NUM_SHARDS):
         writer = tb.TensorboardWriter(cfg)
     else:
         writer = None
@@ -668,9 +645,7 @@ def train(cfg):
                 else:
                     last_checkpoint = cfg.TRAIN.CHECKPOINT_FILE_PATH
                 logger.info("Load from {}".format(last_checkpoint))
-                cu.load_checkpoint(
-                    last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer
-                )
+                cu.load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer)
 
         # Shuffle the dataset.
         loader.shuffle_dataset(train_loader, cur_epoch)
@@ -754,7 +729,9 @@ def train(cfg):
                 train_loader,
                 writer,
             )
-    if start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE: # final checkpoint load
+    if (
+        start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE
+    ):  # final checkpoint load
         eval_epoch(val_loader, model, val_meter, start_epoch, cfg, train_loader, writer)
     if writer is not None:
         writer.close()
