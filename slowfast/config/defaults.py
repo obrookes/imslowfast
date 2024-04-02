@@ -87,6 +87,17 @@ _C.CONTRASTIVE.SWAV_QEUE_LEN = 0
 # Wether to run online kNN evaluation during training
 _C.CONTRASTIVE.KNN_ON = True
 
+# ---------------------------------------------------------------------------- #
+# Temporal action proposal options
+# ---------------------------------------------------------------------------- #
+
+_C.TAP = CfgNode()
+
+_C.TAP.ENABLE = True
+
+_C.TAP.NUM_CLIPS = 4
+
+_C.TAP.NUM_FRAMES = 4
 
 # ---------------------------------------------------------------------------- #
 # Batch norm options
@@ -661,7 +672,7 @@ _C.DATA.PATH_LABEL_SEPARATOR = " "
 _C.DATA.PATH_PREFIX = ""
 
 # The number of frames of the input clip.
-_C.DATA.NUM_FRAMES = 8
+_C.DATA.NUM_FRAMES = 4
 
 # The video sampling rate of the input clip.
 _C.DATA.SAMPLING_RATE = 8
@@ -796,7 +807,7 @@ _C.DATA.IN22K_TRAINVAL = False
 _C.DATA.IN22k_VAL_IN1K = ""
 
 # Large resolution models may use different crop ratios
-_C.DATA.IN_VAL_CROP_RATIO = 0.875 # 224/256 = 0.875
+_C.DATA.IN_VAL_CROP_RATIO = 0.875  # 224/256 = 0.875
 
 # don't use real video for kinetics.py
 _C.DATA.DUMMY_LOAD = False
