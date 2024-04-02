@@ -13,6 +13,24 @@ from . import transform as transform
 logger = logging.getLogger(__name__)
 
 
+def subsample_clip(video_tensor, N=8):
+    T, C, H, W = video_tensor.shape
+    indices = torch.linspace(0, T - 1, N).long()
+    return video_tensor[indices]
+
+
+def video_to_clips(video_tensor, n_clips, n_samples):
+    T, C, H, W = video_tensor.shape
+    T_per_clip = T // n_clips
+    clips = []
+    for i in range(n_clips):
+        ss_clip = subsample_clip(
+            video_tensor[i * T_per_clip : (i + 1) * T_per_clip], n_samples
+        )
+        clips.append(ss_clip)
+    return clips
+
+
 def temporal_sampling(frames, start_idx, end_idx, num_samples):
     """
     Given the start and end frame index, sample num_samples frames between
@@ -66,9 +84,7 @@ def get_start_end_idx(
                 start_idx = math.floor(delta / 2)
             else:
                 # Uniformly sample the clip with the given index.
-                start_idx = clip_idx * math.floor(
-                    delta / (num_clips_uniform - 1)
-                )
+                start_idx = clip_idx * math.floor(delta / (num_clips_uniform - 1))
         else:
             # Uniformly sample the clip with the given index.
             start_idx = delta * clip_idx / num_clips_uniform
@@ -239,6 +255,7 @@ def torchvision_decode(
     use_offset=False,
     min_delta=-math.inf,
     max_delta=math.inf,
+    tap_enabled=False,
 ):
     """
     If video_meta is not empty, perform temporal selective decoding to sample a
@@ -294,12 +311,16 @@ def torchvision_decode(
 
     fps = video_meta["video_fps"]
 
-    if len(video_meta) > 0 and (
-        video_meta["has_video"]
-        and video_meta["video_denominator"] > 0
-        and video_meta["video_duration"] > 0
-        and fps * video_meta["video_duration"]
-        > sum(T * tau for T, tau in zip(num_frames, sampling_rate))
+    if (
+        len(video_meta) > 0
+        and (
+            video_meta["has_video"]
+            and video_meta["video_denominator"] > 0
+            and video_meta["video_duration"] > 0
+            and fps * video_meta["video_duration"]
+            > sum(T * tau for T, tau in zip(num_frames, sampling_rate))
+        )
+        and tap_enabled is not True
     ):
         decode_all_video = False  # try selective decoding
 
@@ -318,9 +339,7 @@ def torchvision_decode(
         )
         frames_out = [None] * len(num_frames)
         for k in range(len(num_frames)):
-            pts_per_frame = (
-                video_meta["video_denominator"] / video_meta["video_fps"]
-            )
+            pts_per_frame = video_meta["video_denominator"] / video_meta["video_fps"]
             video_start_pts = int(start_end_delta_time[k, 0] * pts_per_frame)
             video_end_pts = int(start_end_delta_time[k, 1] * pts_per_frame)
 
@@ -369,7 +388,6 @@ def torchvision_decode(
     if any([t.shape[0] < 0 for t in frames_out]):
         frames_out = [None]
         logger.info("TV decode FAILED: Decoded empty video")
-
     return frames_out, fps, decode_all_video, start_end_delta_time
 
 
@@ -468,6 +486,9 @@ def decode(
     min_delta=-math.inf,
     max_delta=math.inf,
     temporally_rnd_clips=True,
+    tap_enabled=False,
+    tap_num_clips=None,
+    tap_num_frames=None,
 ):
     """
     Decode the video and perform temporal sampling.
@@ -504,9 +525,7 @@ def decode(
         sampling_rate = [sampling_rate[i] for i in ind_clips]
         num_frames = [num_frames[i] for i in ind_clips]
     else:
-        ind_clips = np.arange(
-            num_decode
-        )  # clips come temporally ordered from decoder
+        ind_clips = np.arange(num_decode)  # clips come temporally ordered from decoder
     try:
         if backend == "pyav":
             assert (
@@ -540,11 +559,10 @@ def decode(
                 use_offset=use_offset,
                 min_delta=min_delta,
                 max_delta=max_delta,
+                tap_enabled=tap_enabled,
             )
         else:
-            raise NotImplementedError(
-                "Unknown decoding backend {}".format(backend)
-            )
+            raise NotImplementedError("Unknown decoding backend {}".format(backend))
     except Exception as e:
         print("Failed to decode by {} with exception: {}".format(backend, e))
         return None, None, None
@@ -579,30 +597,50 @@ def decode(
         [None] * num_decode,
     )
     augment_vid = gaussian_prob > 0.0 or time_diff_prob > 0.0
-    for k in range(num_decode):
-        T = num_frames[k]
-        # Perform temporal sampling from the decoded video.
 
-        if decode_all_video:
-            frames = frames_decoded[0]
+    if tap_enabled:
+        frames = frames_decoded[0]
+        video_clips = video_to_clips(
+            frames, n_clips=tap_num_clips, n_samples=tap_num_frames
+        )
+
+        for k in range(num_decode):
+            T = num_frames[k]
+            # Perform temporal sampling from the decoded video.
+            for i, clip in enumerate(video_clips):
+                if augment_vid:
+                    clip, time_diff_aug[k] = transform.augment_raw_frames(
+                        clip, time_diff_prob, gaussian_prob
+                    )
+                video_clips[i] = clip
+            # Convert list of clips to dict of clips
+            frames_k = torch.vstack(video_clips)
+            frames_out[k] = frames_k
+    else:
+        for k in range(num_decode):
+            T = num_frames[k]
+            # Perform temporal sampling from the decoded video.
+
+            if decode_all_video:
+                frames = frames_decoded[0]
+                if augment_vid:
+                    frames = frames.clone()
+                start_idx, end_idx = (
+                    start_end_delta_time[k, 0],
+                    start_end_delta_time[k, 1],
+                )
+            else:
+                frames = frames_decoded[k]
+                # video is already trimmed so we just need subsampling
+                start_idx, end_idx, clip_position = get_start_end_idx(
+                    frames.shape[0], clip_sizes[k], 0, 1
+                )
             if augment_vid:
-                frames = frames.clone()
-            start_idx, end_idx = (
-                start_end_delta_time[k, 0],
-                start_end_delta_time[k, 1],
-            )
-        else:
-            frames = frames_decoded[k]
-            # video is already trimmed so we just need subsampling
-            start_idx, end_idx, clip_position = get_start_end_idx(
-                frames.shape[0], clip_sizes[k], 0, 1
-            )
-        if augment_vid:
-            frames, time_diff_aug[k] = transform.augment_raw_frames(
-                frames, time_diff_prob, gaussian_prob
-            )
-        frames_k = temporal_sampling(frames, start_idx, end_idx, T)
-        frames_out[k] = frames_k
+                frames, time_diff_aug[k] = transform.augment_raw_frames(
+                    frames, time_diff_prob, gaussian_prob
+                )
+            frames_k = temporal_sampling(frames, start_idx, end_idx, T)
+            frames_out[k] = frames_k
 
     # if we shuffle, need to randomize the output, otherwise it will always be past->future
     if num_decode > 1 and temporally_rnd_clips:
@@ -617,8 +655,7 @@ def decode(
         start_end_delta_time = start_end_delta_time_
         time_diff_aug = time_diff_aug_
         assert all(
-            frames_out[i].shape[0] == num_frames_orig[i]
-            for i in range(num_decode)
+            frames_out[i].shape[0] == num_frames_orig[i] for i in range(num_decode)
         )
 
     return frames_out, start_end_delta_time, time_diff_aug
