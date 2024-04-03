@@ -401,7 +401,7 @@ def launch_job(cfg, init_method, func, daemon=False):
         daemon (bool): The spawned processes’ daemon flag. If set to True,
             daemonic processes will be created
     """
-    if cfg.NUM_SHARDS > 1:  # and cfg.USE_SBATCH: --> sbatch srun multi-node training
+    if cfg.NUM_SHARDS >= 1 and cfg.USE_SBATCH:  # --> sbatch srun multi-node training
         is_slurm_job = "SLURM_JOB_ID" in os.environ
         if is_slurm_job:  # SLURM JOB
             rank = int(os.environ["SLURM_PROCID"])
