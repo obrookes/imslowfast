@@ -1,10 +1,10 @@
 TRAIN:
   ENABLE: True
   DATASET: tap
-  BATCH_SIZE: 224
+  BATCH_SIZE: 1
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 1
-  AUTO_RESUME: True
+  AUTO_RESUME: False
 DATA:
   NUM_FRAMES: 16
   SAMPLING_RATE: 8
@@ -12,8 +12,8 @@ DATA:
   TRAIN_CROP_SIZE: 224
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/annotations/slowfast
-  PATH_PREFIX: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/data
+  PATH_TO_DATA_DIR: /home/dl18206/Desktop/phd/code/personal/facebook/slowfast/data/annotations
+  PATH_PREFIX: /home/dl18206/Desktop/phd/data/panaf/acp/videos/all
 RESNET:
   ZERO_INIT_FINAL_BN: True
   WIDTH_PER_GROUP: 64
@@ -47,11 +47,11 @@ MODEL:
 TEST:
   ENABLE: True
   DATASET: tap
-  BATCH_SIZE: 64
+  BATCH_SIZE: 1
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
-NUM_GPUS: 8
+NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .
