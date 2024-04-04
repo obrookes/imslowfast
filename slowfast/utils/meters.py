@@ -680,8 +680,8 @@ class TrainMeter:
         }
         if self._cfg.DATA.MULTI_LABEL:
             stats["map"] = get_map(
-                torch.cat(self.all_preds).cpu().numpy(),
-                torch.cat(self.all_labels).cpu().numpy(),
+                torch.cat(self.all_preds).detach().cpu().numpy(),
+                torch.cat(self.all_labels).detach().cpu().numpy(),
             )
         else:
             top1_err = self.num_top1_mis / self.num_samples
