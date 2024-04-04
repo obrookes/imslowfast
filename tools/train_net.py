@@ -201,20 +201,14 @@ def train_epoch(
             top1_err, top5_err = None, None
             if cfg.DATA.MULTI_LABEL:
                 # Gather all the predictions across all the devices.
-                print(f"Preds: {preds.shape} Labels: {labels.shape}")
                 if cfg.NUM_GPUS > 1:
-                    preds, labels, loss, grad_norm = du.all_reduce(
-                        [preds, labels, loss, grad_norm]
-                    )
-                    print(f"{len(preds)}, {preds[0].shape}")
+                    loss, grad_norm = du.all_reduce([loss, grad_norm])
+                    preds, labels = du.all_gather([preds, labels])
                 # Copy the stats from GPU to CPU (sync point).
-                preds, labels, loss, grad_norm = (
-                    preds.detach(),
-                    labels.detach(),
+                loss, grad_norm = (
                     loss.item(),
                     grad_norm.item(),
                 )
-
             elif cfg.MASK.ENABLE:
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
@@ -251,7 +245,7 @@ def train_epoch(
                 )
 
             # Update and log stats.
-            train_meter.update_predictions(preds, labels)
+            train_meter.update_predictions(preds.detach(), labels.detach())
             train_meter.update_stats(
                 top1_err,
                 top5_err,
