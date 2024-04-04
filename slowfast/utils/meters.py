@@ -72,15 +72,11 @@ class AVAMeter:
         self.categories, self.class_whitelist = read_labelmap(
             os.path.join(cfg.AVA.ANNOTATION_DIR, cfg.AVA.LABEL_MAP_FILE)
         )
-        gt_filename = os.path.join(
-            cfg.AVA.ANNOTATION_DIR, cfg.AVA.GROUNDTRUTH_FILE
-        )
+        gt_filename = os.path.join(cfg.AVA.ANNOTATION_DIR, cfg.AVA.GROUNDTRUTH_FILE)
         self.full_groundtruth = read_csv(gt_filename, self.class_whitelist)
         self.mini_groundtruth = get_ava_mini_groundtruth(self.full_groundtruth)
 
-        _, self.video_idx_to_name = ava_helper.load_image_lists(
-            cfg, mode == "train"
-        )
+        _, self.video_idx_to_name = ava_helper.load_image_lists(cfg, mode == "train")
         self.output_dir = cfg.OUTPUT_DIR
 
         self.min_top1_err = 100.0
@@ -105,9 +101,7 @@ class AVAMeter:
         if self.mode == "train":
             stats = {
                 "_type": "{}_iter".format(self.mode),
-                "cur_epoch": "{}/{}".format(
-                    cur_epoch + 1, self.cfg.SOLVER.MAX_EPOCH
-                ),
+                "cur_epoch": "{}/{}".format(cur_epoch + 1, self.cfg.SOLVER.MAX_EPOCH),
                 "cur_iter": "{}".format(cur_iter + 1),
                 "eta": eta,
                 "dt": self.iter_timer.seconds(),
@@ -120,9 +114,7 @@ class AVAMeter:
         elif self.mode == "val":
             stats = {
                 "_type": "{}_iter".format(self.mode),
-                "cur_epoch": "{}/{}".format(
-                    cur_epoch + 1, self.cfg.SOLVER.MAX_EPOCH
-                ),
+                "cur_epoch": "{}/{}".format(cur_epoch + 1, self.cfg.SOLVER.MAX_EPOCH),
                 "cur_iter": "{}".format(cur_iter + 1),
                 "eta": eta,
                 "dt": self.iter_timer.seconds(),
@@ -339,9 +331,7 @@ class TestMeter:
                 )
             else:
                 raise NotImplementedError(
-                    "Ensemble Method {} is not supported".format(
-                        self.ensemble_method
-                    )
+                    "Ensemble Method {} is not supported".format(self.ensemble_method)
                 )
             self.clip_count[vid_id] += 1
 
@@ -408,16 +398,11 @@ class TestMeter:
             num_topks_correct = metrics.topks_correct(
                 self.video_preds, self.video_labels, ks
             )
-            topks = [
-                (x / self.video_preds.size(0)) * 100.0
-                for x in num_topks_correct
-            ]
+            topks = [(x / self.video_preds.size(0)) * 100.0 for x in num_topks_correct]
             assert len({len(ks), len(topks)}) == 1
             for k, topk in zip(ks, topks):
                 # self.stats["top{}_acc".format(k)] = topk.cpu().numpy()
-                self.stats["top{}_acc".format(k)] = "{:.{prec}f}".format(
-                    topk, prec=2
-                )
+                self.stats["top{}_acc".format(k)] = "{:.{prec}f}".format(topk, prec=2)
         logging.log_json_stats(self.stats)
 
 
@@ -542,6 +527,9 @@ class TrainMeter:
         self.output_dir = cfg.OUTPUT_DIR
         self.multi_loss = None
 
+        self.all_preds = []
+        self.all_labels = []
+
     def reset(self):
         """
         Reset the Meter.
@@ -557,6 +545,8 @@ class TrainMeter:
         self.num_samples = 0
         if self.multi_loss is not None:
             self.multi_loss.reset()
+        self.all_preds = []
+        self.all_labels = []
 
     def iter_tic(self):
         """
@@ -613,15 +603,23 @@ class TrainMeter:
             prev_loss = 0.0
             for i in range(2, 7):
                 prev_loss += self.loss.deque[len(self.loss.deque) - i]
-            if (
-                loss
-                > self._cfg.TRAIN.KILL_LOSS_EXPLOSION_FACTOR * prev_loss / 5.0
-            ):
+            if loss > self._cfg.TRAIN.KILL_LOSS_EXPLOSION_FACTOR * prev_loss / 5.0:
                 raise RuntimeError(
                     "ERROR: Got Loss explosion of {} {}".format(
                         loss, datetime.datetime.now()
                     )
                 )
+
+    def update_predictions(self, preds, labels):
+        """
+        Update predictions and labels.
+        Args:
+            preds (tensor): model output predictions.
+            labels (tensor): labels.
+        """
+        # TODO: merge update_prediction with update_stats.
+        self.all_preds.append(preds)
+        self.all_labels.append(labels)
 
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
@@ -637,9 +635,7 @@ class TrainMeter:
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
-            "_type": "train_iter_{}".format(
-                "ssl" if self._cfg.TASK == "ssl" else ""
-            ),
+            "_type": "train_iter_{}".format("ssl" if self._cfg.TASK == "ssl" else ""),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
             "dt": self.iter_timer.seconds(),
@@ -671,9 +667,7 @@ class TrainMeter:
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
-            "_type": "train_epoch{}".format(
-                "_ssl" if self._cfg.TASK == "ssl" else ""
-            ),
+            "_type": "train_epoch{}".format("_ssl" if self._cfg.TASK == "ssl" else ""),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "dt": self.iter_timer.seconds(),
             "dt_data": self.data_timer.seconds(),
@@ -684,7 +678,12 @@ class TrainMeter:
             "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
             "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
-        if not self._cfg.DATA.MULTI_LABEL:
+        if self._cfg.DATA.MULTI_LABEL:
+            stats["map"] = get_map(
+                torch.cat(self.all_preds).cpu().numpy(),
+                torch.cat(self.all_labels).cpu().numpy(),
+            )
+        else:
             top1_err = self.num_top1_mis / self.num_samples
             top5_err = self.num_top5_mis / self.num_samples
             avg_loss = self.loss_total / self.num_samples
@@ -798,9 +797,7 @@ class ValMeter:
         eta_sec = self.iter_timer.seconds() * (self.max_iter - cur_iter - 1)
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
-            "_type": "val_iter{}".format(
-                "_ssl" if self._cfg.TASK == "ssl" else ""
-            ),
+            "_type": "val_iter{}".format("_ssl" if self._cfg.TASK == "ssl" else ""),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "iter": "{}/{}".format(cur_iter + 1, self.max_iter),
             "time_diff": self.iter_timer.seconds(),
@@ -819,9 +816,7 @@ class ValMeter:
             cur_epoch (int): the number of current epoch.
         """
         stats = {
-            "_type": "val_epoch{}".format(
-                "_ssl" if self._cfg.TASK == "ssl" else ""
-            ),
+            "_type": "val_epoch{}".format("_ssl" if self._cfg.TASK == "ssl" else ""),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
             "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),

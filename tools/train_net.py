@@ -24,7 +24,7 @@ from slowfast.models.contrastive import (
     contrastive_forward,
     contrastive_parameter_surgery,
 )
-from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
+from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter, get_map
 from slowfast.utils.multigrid import MultigridSchedule
 
 logger = logging.get_logger(__name__)
@@ -203,6 +203,8 @@ def train_epoch(
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
                     loss, grad_norm = du.all_reduce([loss, grad_norm])
+                    preds, labels = du.all_gather([preds, labels])
+                # Copy the stats from GPU to CPU (sync point).
                 loss, grad_norm = (
                     loss.item(),
                     grad_norm.item(),
@@ -243,6 +245,7 @@ def train_epoch(
                 )
 
             # Update and log stats.
+            train_meter.update_predictions(preds.detach(), labels.detach())
             train_meter.update_stats(
                 top1_err,
                 top5_err,

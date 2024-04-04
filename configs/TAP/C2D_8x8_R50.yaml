@@ -2,7 +2,7 @@ TRAIN:
   ENABLE: True
   DATASET: tap
   BATCH_SIZE: 224
-  EVAL_PERIOD: 10
+  EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
 DATA:
@@ -14,6 +14,7 @@ DATA:
   INPUT_CHANNEL_NUM: [3]
   PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/annotations/slowfast
   PATH_PREFIX: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/videos/original
+  MULTI_LABEL: True
 RESNET:
   ZERO_INIT_FINAL_BN: True
   WIDTH_PER_GROUP: 64
