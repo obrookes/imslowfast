@@ -618,6 +618,7 @@ class TrainMeter:
             labels (tensor): labels.
         """
         # TODO: merge update_prediction with update_stats.
+        print(f"Labels: {labels.shape}, Preds: {preds.shape}")
         self.all_preds.append(preds)
         self.all_labels.append(labels)
 
@@ -680,8 +681,8 @@ class TrainMeter:
         }
         if self._cfg.DATA.MULTI_LABEL:
             stats["map"] = get_map(
-                torch.cat(self.all_preds).detach().cpu().numpy(),
-                torch.cat(self.all_labels).detach().cpu().numpy(),
+                torch.cat(self.all_preds).cpu().numpy(),
+                torch.cat(self.all_labels).cpu().numpy(),
             )
         else:
             top1_err = self.num_top1_mis / self.num_samples

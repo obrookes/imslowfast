@@ -206,7 +206,9 @@ def train_epoch(
                         [preds, labels, loss, grad_norm]
                     )
                 # Copy the stats from GPU to CPU (sync point).
-                loss, grad_norm = (
+                preds, labels, loss, grad_norm = (
+                    preds.detach(),
+                    labels.detach(),
                     loss.item(),
                     grad_norm.item(),
                 )
