@@ -201,10 +201,12 @@ def train_epoch(
             top1_err, top5_err = None, None
             if cfg.DATA.MULTI_LABEL:
                 # Gather all the predictions across all the devices.
+                print(f"Preds: {preds.shape} Labels: {labels.shape}")
                 if cfg.NUM_GPUS > 1:
                     preds, labels, loss, grad_norm = du.all_reduce(
                         [preds, labels, loss, grad_norm]
                     )
+                    print(f"{len(preds)}, {preds[0].shape}")
                 # Copy the stats from GPU to CPU (sync point).
                 preds, labels, loss, grad_norm = (
                     preds.detach(),

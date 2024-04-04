@@ -618,7 +618,6 @@ class TrainMeter:
             labels (tensor): labels.
         """
         # TODO: merge update_prediction with update_stats.
-        print(f"Labels: {labels.shape}, Preds: {preds.shape}")
         self.all_preds.append(preds)
         self.all_labels.append(labels)
 
