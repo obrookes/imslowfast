@@ -15,7 +15,7 @@ from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
 from torch import nn
 from torchvision.utils import make_grid
-
+import torch.distributed as dist
 import slowfast.utils.logging as logging
 import slowfast.utils.multiprocessing as mpu
 from slowfast.datasets.utils import pack_pathway_output
@@ -213,9 +213,7 @@ def is_eval_epoch(cfg, cur_epoch, multigrid_schedule):
         prev_epoch = 0
         for s in multigrid_schedule:
             if cur_epoch < s[-1]:
-                period = max(
-                    (s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1
-                )
+                period = max((s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1)
                 return (s[-1] - 1 - cur_epoch) % period == 0
             prev_epoch = s[-1]
 
@@ -339,18 +337,10 @@ def plot_input_normed(
                     if bboxes is not None and len(bboxes) > i:
                         for box in bboxes[i]:
                             x1, y1, x2, y2 = box
-                            ax[i].vlines(
-                                x1, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].vlines(
-                                x2, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y1, x1, x2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y2, x1, x2, colors="g", linestyles="solid"
-                            )
+                            ax[i].vlines(x1, y1, y2, colors="g", linestyles="solid")
+                            ax[i].vlines(x2, y1, y2, colors="g", linestyles="solid")
+                            ax[i].hlines(y1, x1, x2, colors="g", linestyles="solid")
+                            ax[i].hlines(y2, x1, x2, colors="g", linestyles="solid")
 
                     if texts is not None and len(texts) > i:
                         ax[i].text(0, 0, texts[i])
@@ -411,21 +401,32 @@ def launch_job(cfg, init_method, func, daemon=False):
         daemon (bool): The spawned processes’ daemon flag. If set to True,
             daemonic processes will be created
     """
-    if cfg.NUM_GPUS > 1:
-        torch.multiprocessing.spawn(
-            mpu.run,
-            nprocs=cfg.NUM_GPUS,
-            args=(
-                cfg.NUM_GPUS,
-                func,
-                init_method,
-                cfg.SHARD_ID,
-                cfg.NUM_SHARDS,
-                cfg.DIST_BACKEND,
-                cfg,
-            ),
-            daemon=daemon,
+    if cfg.NUM_SHARDS >= 1 and cfg.USE_SBATCH:  # --> sbatch srun multi-node training
+        is_slurm_job = "SLURM_JOB_ID" in os.environ
+        if is_slurm_job:  # SLURM JOB
+            rank = int(os.environ["SLURM_PROCID"])
+            world_size = int(os.environ["SLURM_NNODES"]) * int(
+                os.environ["SLURM_TASKS_PER_NODE"][0]
+            )
+        else:  # LOCAL BASH RUN
+            rank = int(os.environ["RANK"])
+            world_size = int(os.environ["WORLD_SIZE"])
+
+        # Init process group
+        dist.init_process_group(
+            backend="nccl",
+            init_method=init_method,  # 'env://'
+            world_size=world_size,
+            rank=rank,
         )
+
+        # Set local rank
+        gpu_to_work_on = rank % torch.cuda.device_count()
+        torch.cuda.set_device(gpu_to_work_on)
+
+        # Start run
+        # cfg.SHARD_ID = rank
+        func(cfg=cfg)
     else:
         func(cfg=cfg)
 
@@ -468,17 +469,11 @@ def get_class_names(path, parent_path=None, subset_path=None):
             with pathmgr.open(parent_path, "r") as f:
                 d_parent = json.load(f)
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    parent_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(parent_path, err))
             return
         class_parent = {}
         for parent, children in d_parent.items():
-            indices = [
-                class2idx[c] for c in children if class2idx.get(c) is not None
-            ]
+            indices = [class2idx[c] for c in children if class2idx.get(c) is not None]
             class_parent[parent] = indices
 
     subset_ids = None
@@ -492,11 +487,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
                     if class2idx.get(name) is not None
                 ]
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    subset_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(subset_path, err))
             return
 
     return class_names, class_parent, subset_ids

@@ -24,7 +24,7 @@ from slowfast.models.contrastive import (
     contrastive_forward,
     contrastive_parameter_surgery,
 )
-from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
+from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter, get_map
 from slowfast.utils.multigrid import MultigridSchedule
 
 logger = logging.get_logger(__name__)
@@ -117,7 +117,12 @@ def train_epoch(
             optimizer.zero_grad()
 
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                (model, preds, partial_loss, perform_backward,) = contrastive_forward(
+                (
+                    model,
+                    preds,
+                    partial_loss,
+                    perform_backward,
+                ) = contrastive_forward(
                     model, cfg, inputs, index, time, epoch_exact, scaler
                 )
             elif cfg.DETECTION.ENABLE:
@@ -198,6 +203,8 @@ def train_epoch(
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
                     loss, grad_norm = du.all_reduce([loss, grad_norm])
+                    preds, labels = du.all_gather([preds, labels])
+                # Copy the stats from GPU to CPU (sync point).
                 loss, grad_norm = (
                     loss.item(),
                     grad_norm.item(),
@@ -218,12 +225,11 @@ def train_epoch(
                     loss_extra = [one_loss.item() for one_loss in loss_extra]
             else:
                 # Compute the errors.
-                top1_err = torchmetrics.functional.accuracy(
-                    preds, labels, task="multilabel", num_labels=18, top_k=1
-                )
-                top5_err = torchmetrics.functional.accuracy(
-                    preds, labels, task="multilabel", num_labels=18, top_k=5
-                )
+                # Compute the errors.
+                num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+                top1_err, top5_err = [
+                    (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
+                ]
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
                     loss, grad_norm, top1_err, top5_err = du.all_reduce(
@@ -239,6 +245,7 @@ def train_epoch(
                 )
 
             # Update and log stats.
+            train_meter.update_predictions(preds.detach(), labels.detach())
             train_meter.update_stats(
                 top1_err,
                 top5_err,
@@ -740,9 +747,11 @@ def train(cfg):
         "".format(
             params / 1e6,
             flops,
-            epoch_timer.median_epoch_time() / 60.0
-            if len(epoch_timer.epoch_times)
-            else 0.0,
+            (
+                epoch_timer.median_epoch_time() / 60.0
+                if len(epoch_timer.epoch_times)
+                else 0.0
+            ),
             misc.gpu_mem_usage(),
             100 - val_meter.min_top1_err,
             100 - val_meter.min_top5_err,
