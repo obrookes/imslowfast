@@ -1,5 +1,5 @@
 TRAIN:
-  ENABLE: True
+  ENABLE: False
   DATASET: tap
   BATCH_SIZE: 224
   EVAL_PERIOD: 1
@@ -15,6 +15,7 @@ DATA:
   PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/annotations/slowfast
   PATH_PREFIX: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/videos/original
   MULTI_LABEL: True
+  ENSEMBLE_METHOD: max
 RESNET:
   ZERO_INIT_FINAL_BN: True
   WIDTH_PER_GROUP: 64
@@ -49,6 +50,8 @@ TEST:
   ENABLE: True
   DATASET: tap
   BATCH_SIZE: 64
+  NUM_ENSEMBLE_VIEWS: 1
+  NUM_SPATIAL_CROPS: 1
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
