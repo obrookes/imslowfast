@@ -530,6 +530,9 @@ class TrainMeter:
         self.all_preds = []
         self.all_labels = []
 
+        self.micro_map = None
+        self.macro_map = None
+
     def reset(self):
         """
         Reset the Meter.
@@ -547,6 +550,8 @@ class TrainMeter:
             self.multi_loss.reset()
         self.all_preds = []
         self.all_labels = []
+        self.micro_map = None
+        self.macro_map = None
 
     def iter_tic(self):
         """
@@ -679,10 +684,19 @@ class TrainMeter:
             "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
         if self._cfg.DATA.MULTI_LABEL:
-            stats["map"] = get_map(
+            preds, labels = (
                 torch.cat(self.all_preds).cpu().numpy(),
                 torch.cat(self.all_labels).cpu().numpy(),
             )
+            macro_map = average_precision_score(labels, preds, average="macro")
+            micro_map = average_precision_score(labels, preds, average="micro")
+
+            stats["micro_map"] = micro_map
+            stats["macro_map"] = macro_map
+
+            self.micro_map = micro_map
+            self.macro_map = macro_map
+
         else:
             top1_err = self.num_top1_mis / self.num_samples
             top5_err = self.num_top5_mis / self.num_samples
@@ -725,6 +739,8 @@ class ValMeter:
         self.num_samples = 0
         self.all_preds = []
         self.all_labels = []
+        self.macro_map = None
+        self.micro_map = None
         self.output_dir = cfg.OUTPUT_DIR
 
     def reset(self):
@@ -741,6 +757,8 @@ class ValMeter:
         self.num_samples = 0
         self.all_preds = []
         self.all_labels = []
+        self.macro_map = None
+        self.micro_map = None
 
     def iter_tic(self):
         """
@@ -823,10 +841,18 @@ class ValMeter:
             "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
         if self._cfg.DATA.MULTI_LABEL:
-            stats["map"] = get_map(
+            preds, labels = (
                 torch.cat(self.all_preds).cpu().numpy(),
                 torch.cat(self.all_labels).cpu().numpy(),
             )
+            macro_map = average_precision_score(labels, preds, average="macro")
+            micro_map = average_precision_score(labels, preds, average="micro")
+
+            stats["micro_map"] = micro_map
+            stats["macro_map"] = macro_map
+
+            self.micro_map = micro_map
+            self.macro_map = macro_map
         else:
             top1_err = self.num_top1_mis / self.num_samples
             top5_err = self.num_top5_mis / self.num_samples

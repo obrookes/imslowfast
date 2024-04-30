@@ -53,9 +53,7 @@ def build_model(cfg, gpu_id=None):
         process_group = apex.parallel.create_syncbn_process_group(
             group_size=cfg.BN.NUM_SYNC_DEVICES
         )
-        model = apex.parallel.convert_syncbn_model(
-            model, process_group=process_group
-        )
+        model = apex.parallel.convert_syncbn_model(model, process_group=process_group)
 
     if cfg.NUM_GPUS:
         if gpu_id is None:
@@ -72,10 +70,12 @@ def build_model(cfg, gpu_id=None):
             module=model,
             device_ids=[cur_device],
             output_device=cur_device,
-            find_unused_parameters=True
-            if cfg.MODEL.DETACH_FINAL_FC
-            or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-            else False,
+            find_unused_parameters=(
+                True
+                if cfg.MODEL.DETACH_FINAL_FC
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                else False
+            ),
         )
         if cfg.MODEL.FP16_ALLREDUCE:
             model.register_comm_hook(

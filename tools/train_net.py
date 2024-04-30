@@ -260,15 +260,24 @@ def train_epoch(
             )
             # write to tensorboard format if available.
             if writer is not None:
-                writer.add_scalars(
-                    {
-                        "Train/loss": loss,
-                        "Train/lr": lr,
-                        "Train/Top1_err": top1_err,
-                        "Train/Top5_err": top5_err,
-                    },
-                    global_step=data_size * cur_epoch + cur_iter,
-                )
+                if cfg.DATA.MULTI_LABEL:
+                    writer.add_scalars(
+                        {
+                            "Train/loss": loss,
+                            "Train/lr": lr,
+                        },
+                        global_step=data_size * cur_epoch + cur_iter,
+                    )
+                else:
+                    writer.add_scalars(
+                        {
+                            "Train/loss": loss,
+                            "Train/lr": lr,
+                            "Train/Top1_err": top1_err,
+                            "Train/Top5_err": top5_err,
+                        },
+                        global_step=data_size * cur_epoch + cur_iter,
+                    )
         train_meter.iter_toc()  # do measure allreduce for this meter
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         torch.cuda.synchronize()
@@ -280,6 +289,17 @@ def train_epoch(
 
     # Log epoch stats.
     train_meter.log_epoch_stats(cur_epoch)
+
+    # write to tensorboard format if available.
+    if writer is not None:
+        if cfg.DATA.MULTI_LABEL:
+            writer.add_scalars(
+                {
+                    "Train/micro_mAP": train_meter.micro_map,
+                    "Train/macro_mAP": train_meter.macro_map,
+                },
+                global_step=cur_epoch,
+            )
     train_meter.reset()
 
 
@@ -414,6 +434,14 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
     val_meter.log_epoch_stats(cur_epoch)
     # write to tensorboard format if available.
     if writer is not None:
+        if cfg.DATA.MULTI_LABEL:
+            writer.add_scalars(
+                {
+                    "Val/micro_mAP": val_meter.micro_map,
+                    "Val/macro_mAP": val_meter.macro_map,
+                },
+                global_step=cur_epoch,
+            )
         if cfg.DETECTION.ENABLE:
             writer.add_scalars({"Val/mAP": val_meter.full_map}, global_step=cur_epoch)
         else:
