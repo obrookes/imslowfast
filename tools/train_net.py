@@ -300,6 +300,7 @@ def train_epoch(
                 },
                 global_step=cur_epoch,
             )
+            writer.add_scalars({"Train/APs": train_meter.aps}, global_step=cur_epoch)
     train_meter.reset()
 
 
@@ -442,6 +443,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                 },
                 global_step=cur_epoch,
             )
+            writer.add_scalars({"Val/APs": val_meter.aps}, global_step=cur_epoch)
         if cfg.DETECTION.ENABLE:
             writer.add_scalars({"Val/mAP": val_meter.full_map}, global_step=cur_epoch)
         else:
