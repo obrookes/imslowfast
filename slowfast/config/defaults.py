@@ -235,6 +235,18 @@ _C.AUG.MASK_RATIO = 0.0
 _C.AUG.MAX_MASK_PATCHES_PER_BLOCK = None
 
 # ---------------------------------------------------------------------------- #
+# Data sampling options.
+# ---------------------------------------------------------------------------- #
+
+_C.SAMPLING = CfgNode()
+
+# Whether to perform balanced sampling
+_C.SAMPLING.BALANCED = False
+
+# How to perform balanced sampling
+_C.SAMPLING.BALANCE_TYPE = None
+
+# ---------------------------------------------------------------------------- #
 # Masked pretraining visualization options.
 # ---------------------------------------------------------------------------- #
 _C.VIS_MASK = CfgNode()
