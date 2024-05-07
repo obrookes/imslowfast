@@ -144,7 +144,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
             )
         else:
             # Create a sampler for multi-process training
-            sampler = utils.create_sampler(dataset, shuffle, cfg)
+            sampler = utils.create_sampler(dataset, split, cfg)
             # Create a loader
             if cfg.DETECTION.ENABLE:
                 collate_func = detection_collate

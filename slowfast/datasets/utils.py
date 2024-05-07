@@ -333,46 +333,55 @@ def revert_tensor_normalize(tensor, mean, std):
     return tensor
 
 
-def create_sampler(dataset, shuffle, cfg):
+def create_sampler(dataset, split, cfg):
     """
     Create sampler for the given dataset.
     Args:
         dataset (torch.utils.data.Dataset): the given dataset.
-        shuffle (bool): set to ``True`` to have the data reshuffled
-            at every epoch.
+        split (bool): dataset partition.
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     Returns:
         sampler (Sampler): the created sampler.
     """
     print(
-        f"cfg.NUM_GPUS: {cfg.NUM_GPUS}; cfg.SAMPLING.BALANCED: {cfg.SAMPLING.BALANCED}; cfg.SAMPLING.BALANCE_TYPE: {cfg.SAMPLING.BALANCE_TYPE}"
+        f"SAMPLING.BALANCED: {cfg.SAMPLING.BALANCED}; BALANCE_TYPE: {cfg.SAMPLING.BALANCE_TYPE}"
     )
-    if cfg.NUM_GPUS > 1:
-        sampler = DistributedSampler(dataset)
-    if cfg.NUM_GPUS == 1 and cfg.SAMPLING.BALANCED:
-        if cfg.SAMPLING.BALANCE_TYPE:
-            if cfg.SAMPLING.BALANCE_TYPE == "random":
-                sampler = RandomClassSampler(
-                    labels=torch.IntTensor(dataset._labels),
-                    indices=list(range(len(dataset))),
-                )
-            elif cfg.SAMPLING.BALANCE_TYPE == "cycle":
-                sampler = ClassCycleSampler(
-                    labels=torch.IntTensor(dataset._labels),
-                    indices=list(range(len(dataset))),
-                )
-            elif cfg.SAMPLING.BALANCE_TYPE == "least_sampled":
-                sampler = LeastSampledClassSampler(
-                    labels=torch.IntTensor(dataset._labels),
-                    indices=list(range(len(dataset))),
-                )
-            else:
-                raise NotImplementedError(
-                    "Balanced sampler type {} is not supported.".format(
-                        cfg.SAMPLING.BALANCE_TYPE
+    if split in ["val", "test"]:
+        if cfg.NUM_GPUS > 1:
+            sampler = DistributedSampler(dataset)
+        else:  # Single GPU test.
+            sampler = None
+    else:  # Training.
+        if cfg.NUM_GPUS > 1:
+            sampler = DistributedSampler(dataset)
+        elif cfg.NUM_GPUS == 1 and cfg.SAMPLING.BALANCED:
+            if cfg.SAMPLING.BALANCE_TYPE:
+                if cfg.SAMPLING.BALANCE_TYPE == "random":
+                    sampler = RandomClassSampler(
+                        labels=torch.IntTensor(dataset._labels),
+                        indices=list(range(len(dataset))),
                     )
-                )
+                elif cfg.SAMPLING.BALANCE_TYPE == "cycle":
+                    sampler = ClassCycleSampler(
+                        labels=torch.IntTensor(dataset._labels),
+                        indices=list(range(len(dataset))),
+                    )
+                elif cfg.SAMPLING.BALANCE_TYPE == "least_sampled":
+                    sampler = LeastSampledClassSampler(
+                        labels=torch.IntTensor(dataset._labels),
+                        indices=list(range(len(dataset))),
+                    )
+                else:
+                    raise NotImplementedError(
+                        "Balanced sampler type {} is not supported.".format(
+                            cfg.SAMPLING.BALANCE_TYPE
+                        )
+                    )
+        else:
+            raise NotImplementedError(
+                "Balanced sampler is not supported for multi-GPU training."
+            )
     return sampler
 
 
