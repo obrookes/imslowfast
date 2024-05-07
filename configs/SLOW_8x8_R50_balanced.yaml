@@ -7,6 +7,7 @@ TRAIN:
   CHECKPOINT_FILE_PATH: model=slow_r50_ds=panaf_seq/checkpoints/checkpoint_epoch_00090.pyth
   CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
+  CHECKPOINT_EPOCH_RESET: True
 DATA:
   NUM_FRAMES: 16
   SAMPLING_RATE: 24
