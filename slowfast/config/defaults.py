@@ -455,6 +455,12 @@ _C.MODEL.ACT_CHECKPOINT = False
 # final fc layer will be trained.
 _C.MODEL.DETACH_FINAL_FC = False
 
+# If True, detach the head from the network, by doing so, only the head will be trained.
+_C.MODEL.DETACH_HEAD = False
+
+# Reinitialize the head.
+_C.MODEL.REINIT_HEAD = False
+
 # If True, frozen batch norm stats during training.
 _C.MODEL.FROZEN_BN = False
 
