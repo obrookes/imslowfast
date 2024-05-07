@@ -54,7 +54,9 @@ MODEL:
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
-  DETACH_FINAL_FC: True
+  DETACH_FINAL_FC: False
+  DETACH_HEAD: True
+  REINIT_HEAD: True
 SAMPLING:
   BALANCED: True
   BALANCE_TYPE: random
