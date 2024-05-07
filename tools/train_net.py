@@ -20,6 +20,7 @@ import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.datasets.mixup import MixUp
 from slowfast.models import build_model
+from slowfast.models.head_helper import ResNetBasicHead
 from slowfast.models.contrastive import (
     contrastive_forward,
     contrastive_parameter_surgery,
@@ -640,6 +641,12 @@ def train(cfg):
         writer = tb.TensorboardWriter(cfg)
     else:
         writer = None
+
+    # Reinitialise classifier head if required
+    if cfg.MODEL.REINIT_HEAD:
+        print(f"Reinitialising head of model {cfg.MODEL.ARCH}...")
+        assert isinstance(model.head, ResNetBasicHead), "Head must be a ResNetBasicHead"
+        model.head.reset_weights()
 
     # Perform the training loop.
     logger.info("Start epoch: {}".format(start_epoch + 1))
