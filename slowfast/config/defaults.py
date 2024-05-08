@@ -234,6 +234,10 @@ _C.AUG.MASK_RATIO = 0.0
 # The maximum number of a masked block. None means no maximum limit. (Used only in image MaskFeat.)
 _C.AUG.MAX_MASK_PATCHES_PER_BLOCK = None
 
+_C.AUG.MANIFOLD_MIXUP = False
+
+_C.AUG.MANIFOLD_MIXUP_ALPHA = 1.0
+
 # ---------------------------------------------------------------------------- #
 # Data sampling options.
 # ---------------------------------------------------------------------------- #
