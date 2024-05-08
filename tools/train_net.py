@@ -395,6 +395,8 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                     yd_transform.view(batch_size, -1, 1),
                 )
                 preds = torch.sum(probs, 1)
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                preds = model(inputs, labels)
             else:
                 preds = model(inputs)
 
