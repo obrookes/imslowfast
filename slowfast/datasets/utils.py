@@ -355,6 +355,8 @@ def create_sampler(dataset, split, cfg):
     else:  # Training.
         if cfg.NUM_GPUS > 1:
             sampler = DistributedSampler(dataset)
+        elif cfg.NUM_GPUS == 1 and not cfg.SAMPLING.BALANCED:
+            sampler = None
         elif cfg.NUM_GPUS == 1 and cfg.SAMPLING.BALANCED:
             if cfg.SAMPLING.BALANCE_TYPE:
                 if cfg.SAMPLING.BALANCE_TYPE == "random":
