@@ -311,7 +311,7 @@ class ResNetBasicHead(nn.Module):
         Reinitialize all the weights of the model with random values.
         """
         for m in self.modules():
-            if isinstance(m, nn.Linear):
+            if isinstance(m, nn.Linear) or isinstance(m, nn.Conv3d):
                 nn.init.normal_(m.weight, mean=0.0, std=0.01)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
