@@ -2,7 +2,7 @@
 
 
 """Video models."""
-
+import json
 import math
 from functools import partial
 import torch
@@ -692,6 +692,10 @@ class ManifoldMixupResNet(nn.Module):
         self.num_pathways = 1
         self.manifold_mixup_alpha = cfg.AUG.MANIFOLD_MIXUP_ALPHA
         self.use_cuda = True if cfg.NUM_GPUS > 0 else False
+        if cfg.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES != "":
+            with open(cfg.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES, "r") as f:
+                class_frequencies = json.load(f)
+            self.class_proportions = self.calculate_class_proportions(class_frequencies)
         self._construct_network(cfg)
 
         init_helper.init_weights(
@@ -858,8 +862,39 @@ class ManifoldMixupResNet(nn.Module):
 
         self.projection = self.head.projection
 
-    def mixup_data(self, x, y, alpha=1.0, use_cuda=False):
+    def calculate_class_proportions(self, class_frequencies):
+        """
+        Calculate the proportions of each class based on the class frequencies
+        in the dataset.
+        """
+        # Calculate the total frequency
+        total_freq = sum(class_frequencies.values())
+
+        # Calculate the proportions
+        proportions = [freq / total_freq for freq in class_frequencies.values()]
+
+        return proportions
+
+    def calculate_lambdas(self, y, class_frequencies):
+        """
+        Calculate the lambda values for the mixup method based on the class frequencies
+        in the dataset. Lambda values are additive in this case.
+        """
+        lambdas = []
+        # Get non zero indices of multi-hot encoded labels
+        for i in range(y.shape[0]):
+            indices = torch.nonzero(y[i], as_tuple=True)[0]
+            # Calculate the lambda values for each sample
+            lam = 0
+            for index in indices:
+                lam += class_frequencies[index.item()]
+            lambdas.append([lam])
+        return torch.tensor(lambdas)
+
+    def mixup_data(self, x, y, alpha=1.0, use_cuda=False, class_proportions=None):
         """Returns mixed inputs, pairs of targets, and lambda"""
+        if class_proportions is not None:
+            lam = self.calculate_lambdas(y, class_proportions)
         if alpha > 0:
             lam = torch.distributions.beta.Beta(alpha, alpha).sample(((x.size(0)), 1))
             lam = lam.to(x.device)
@@ -894,7 +929,11 @@ class ManifoldMixupResNet(nn.Module):
         # Mix the latent encodings
         if self.training:
             x, y_a, y_b, lam = self.mixup_data(
-                x, labels, alpha=self.manifold_mixup_alpha, use_cuda=self.use_cuda
+                x,
+                labels,
+                alpha=self.manifold_mixup_alpha,
+                use_cuda=self.use_cuda,
+                class_proportions=self.class_proportions,
             )
             x = self.projection(x)
             return x, y_a, y_b, lam
