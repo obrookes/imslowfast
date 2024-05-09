@@ -44,9 +44,7 @@ class TensorboardWriter:
         self.hist_figsize = cfg.TENSORBOARD.HISTOGRAM.FIGSIZE
 
         if cfg.TENSORBOARD.LOG_DIR == "":
-            log_dir = os.path.join(
-                cfg.OUTPUT_DIR, "runs-{}".format(cfg.TRAIN.DATASET)
-            )
+            log_dir = os.path.join(cfg.OUTPUT_DIR, "runs-{}".format(cfg.TRAIN.DATASET))
         else:
             log_dir = os.path.join(cfg.OUTPUT_DIR, cfg.TENSORBOARD.LOG_DIR)
 
@@ -96,7 +94,10 @@ class TensorboardWriter:
         """
         if self.writer is not None:
             for key, item in data_dict.items():
-                self.writer.add_scalar(key, item, global_step)
+                if isinstance(item, dict):
+                    self.writer.add_scalars(key, item, global_step)
+                else:
+                    self.writer.add_scalar(key, item, global_step)
 
     def plot_eval(self, preds, labels, global_step=None):
         """
@@ -321,9 +322,7 @@ def plot_hist(
                 figsize=figsize,
             )
             writer.add_figure(
-                tag="Top {} predictions by classes/{}".format(
-                    k, class_names[i]
-                ),
+                tag="Top {} predictions by classes/{}".format(k, class_names[i]),
                 figure=hist,
                 global_step=global_step,
             )
@@ -391,17 +390,14 @@ def add_ndim_array(
             reshaped_array = array.view(-1, *last2_dims)
             if heat_map:
                 reshaped_array = [
-                    add_heatmap(array_2d).unsqueeze(0)
-                    for array_2d in reshaped_array
+                    add_heatmap(array_2d).unsqueeze(0) for array_2d in reshaped_array
                 ]
                 reshaped_array = torch.cat(reshaped_array, dim=0)
             else:
                 reshaped_array = reshaped_array.unsqueeze(1)
             if nrow is None:
                 nrow = int(math.sqrt(reshaped_array.size()[0]))
-            img_grid = make_grid(
-                reshaped_array, nrow, padding=1, normalize=normalize
-            )
+            img_grid = make_grid(reshaped_array, nrow, padding=1, normalize=normalize)
             writer.add_image(name, img_grid, global_step=global_step)
 
 

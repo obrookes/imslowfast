@@ -9,6 +9,11 @@ from collections import defaultdict
 import cv2
 import torch
 from torch.utils.data.distributed import DistributedSampler
+from pytorch_multilabel_balanced_sampler.samplers import (
+    RandomClassSampler,
+    ClassCycleSampler,
+    LeastSampledClassSampler,
+)
 
 from torchvision import transforms
 
@@ -265,9 +270,7 @@ def load_image_lists(frame_list_file, prefix="", return_list=False):
             image_paths[video_name].append(path)
             frame_labels = row[-1].replace('"', "")
             if frame_labels != "":
-                labels[video_name].append(
-                    [int(x) for x in frame_labels.split(",")]
-                )
+                labels[video_name].append([int(x) for x in frame_labels.split(",")])
             else:
                 labels[video_name].append([])
 
@@ -330,20 +333,57 @@ def revert_tensor_normalize(tensor, mean, std):
     return tensor
 
 
-def create_sampler(dataset, shuffle, cfg):
+def create_sampler(dataset, split, cfg):
     """
     Create sampler for the given dataset.
     Args:
         dataset (torch.utils.data.Dataset): the given dataset.
-        shuffle (bool): set to ``True`` to have the data reshuffled
-            at every epoch.
+        split (bool): dataset partition.
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     Returns:
         sampler (Sampler): the created sampler.
     """
-    sampler = DistributedSampler(dataset) if cfg.NUM_GPUS > 1 else None
-
+    print(
+        f"SAMPLING.BALANCED: {cfg.SAMPLING.BALANCED}; BALANCE_TYPE: {cfg.SAMPLING.BALANCE_TYPE}"
+    )
+    if split in ["val", "test"]:
+        if cfg.NUM_GPUS > 1:
+            sampler = DistributedSampler(dataset)
+        else:  # Single GPU test.
+            sampler = None
+    else:  # Training.
+        if cfg.NUM_GPUS > 1:
+            sampler = DistributedSampler(dataset)
+        elif cfg.NUM_GPUS == 1 and not cfg.SAMPLING.BALANCED:
+            sampler = None
+        elif cfg.NUM_GPUS == 1 and cfg.SAMPLING.BALANCED:
+            if cfg.SAMPLING.BALANCE_TYPE:
+                if cfg.SAMPLING.BALANCE_TYPE == "random":
+                    sampler = RandomClassSampler(
+                        labels=torch.IntTensor(dataset._labels),
+                        indices=list(range(len(dataset))),
+                    )
+                elif cfg.SAMPLING.BALANCE_TYPE == "cycle":
+                    sampler = ClassCycleSampler(
+                        labels=torch.IntTensor(dataset._labels),
+                        indices=list(range(len(dataset))),
+                    )
+                elif cfg.SAMPLING.BALANCE_TYPE == "least_sampled":
+                    sampler = LeastSampledClassSampler(
+                        labels=torch.IntTensor(dataset._labels),
+                        indices=list(range(len(dataset))),
+                    )
+                else:
+                    raise NotImplementedError(
+                        "Balanced sampler type {} is not supported.".format(
+                            cfg.SAMPLING.BALANCE_TYPE
+                        )
+                    )
+        else:
+            raise NotImplementedError(
+                "Balanced sampler is not supported for multi-GPU training."
+            )
     return sampler
 
 
@@ -420,9 +460,7 @@ def aug_frame(
         inverse_uniform_sampling=cfg.DATA.INV_UNIFORM_SAMPLE,
         aspect_ratio=relative_aspect,
         scale=relative_scales,
-        motion_shift=cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-        if mode in ["train"]
-        else False,
+        motion_shift=cfg.DATA.TRAIN_JITTER_MOTION_SHIFT if mode in ["train"] else False,
     )
 
     if rand_erase:
@@ -441,9 +479,7 @@ def aug_frame(
 
 
 def _frame_to_list_img(frames):
-    img_list = [
-        transforms.ToPILImage()(frames[i]) for i in range(frames.size(0))
-    ]
+    img_list = [transforms.ToPILImage()(frames[i]) for i in range(frames.size(0))]
     return img_list
 
 

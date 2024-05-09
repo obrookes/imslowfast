@@ -234,6 +234,22 @@ _C.AUG.MASK_RATIO = 0.0
 # The maximum number of a masked block. None means no maximum limit. (Used only in image MaskFeat.)
 _C.AUG.MAX_MASK_PATCHES_PER_BLOCK = None
 
+_C.AUG.MANIFOLD_MIXUP = False
+
+_C.AUG.MANIFOLD_MIXUP_ALPHA = 1.0
+
+# ---------------------------------------------------------------------------- #
+# Data sampling options.
+# ---------------------------------------------------------------------------- #
+
+_C.SAMPLING = CfgNode()
+
+# Whether to perform balanced sampling
+_C.SAMPLING.BALANCED = False
+
+# How to perform balanced sampling
+_C.SAMPLING.BALANCE_TYPE = None
+
 # ---------------------------------------------------------------------------- #
 # Masked pretraining visualization options.
 # ---------------------------------------------------------------------------- #
@@ -442,6 +458,12 @@ _C.MODEL.ACT_CHECKPOINT = False
 # If True, detach the final fc layer from the network, by doing so, only the
 # final fc layer will be trained.
 _C.MODEL.DETACH_FINAL_FC = False
+
+# If True, detach the head from the network, by doing so, only the head will be trained.
+_C.MODEL.DETACH_HEAD = False
+
+# Reinitialize the head.
+_C.MODEL.REINIT_HEAD = False
 
 # If True, frozen batch norm stats during training.
 _C.MODEL.FROZEN_BN = False

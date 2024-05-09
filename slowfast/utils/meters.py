@@ -43,6 +43,30 @@ def get_ava_mini_groundtruth(full_groundtruth):
     return ret
 
 
+def list2dict(x):
+    """
+    Convert list to enumerated dictionary.
+    """
+    class_dict = {
+        "aggression": 0,
+        "bipedal": 1,
+        "camera_reaction": 2,
+        "climbing": 3,
+        "display": 4,
+        "feeding": 5,
+        "grooming": 6,
+        "object_carrying": 7,
+        "piloerection": 8,
+        "playing": 9,
+        "resting": 10,
+        "tool_use": 11,
+        "travel": 12,
+        "vocalisation": 13,
+    }
+    inverted_dict = {v: k for k, v in class_dict.items()}
+    return {f"{inverted_dict[i]}": x[i] for i in range(len(x))}
+
+
 class AVAMeter:
     """
     Measure the AVA train, val, and test stats.
@@ -532,6 +556,7 @@ class TrainMeter:
 
         self.micro_map = None
         self.macro_map = None
+        self.aps = None
 
     def reset(self):
         """
@@ -552,6 +577,7 @@ class TrainMeter:
         self.all_labels = []
         self.micro_map = None
         self.macro_map = None
+        self.aps = None
 
     def iter_tic(self):
         """
@@ -690,12 +716,14 @@ class TrainMeter:
             )
             macro_map = average_precision_score(labels, preds, average="macro")
             micro_map = average_precision_score(labels, preds, average="micro")
+            aps = average_precision_score(labels, preds, average=None)
 
             stats["micro_map"] = micro_map
             stats["macro_map"] = macro_map
 
             self.micro_map = micro_map
             self.macro_map = macro_map
+            self.aps = list2dict(aps)
 
         else:
             top1_err = self.num_top1_mis / self.num_samples
@@ -741,6 +769,7 @@ class ValMeter:
         self.all_labels = []
         self.macro_map = None
         self.micro_map = None
+        self.aps = None
         self.output_dir = cfg.OUTPUT_DIR
 
     def reset(self):
@@ -759,6 +788,7 @@ class ValMeter:
         self.all_labels = []
         self.macro_map = None
         self.micro_map = None
+        self.aps = None
 
     def iter_tic(self):
         """
@@ -847,12 +877,14 @@ class ValMeter:
             )
             macro_map = average_precision_score(labels, preds, average="macro")
             micro_map = average_precision_score(labels, preds, average="micro")
+            aps = average_precision_score(labels, preds, average=None)
 
             stats["micro_map"] = micro_map
             stats["macro_map"] = macro_map
 
             self.micro_map = micro_map
             self.macro_map = macro_map
+            self.aps = list2dict(aps)
         else:
             top1_err = self.num_top1_mis / self.num_samples
             top5_err = self.num_top5_mis / self.num_samples
