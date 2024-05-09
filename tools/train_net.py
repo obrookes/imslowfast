@@ -20,6 +20,7 @@ import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.datasets.mixup import MixUp
 from slowfast.models import build_model
+from slowfast.models.head_helper import ResNetBasicHead
 from slowfast.models.contrastive import (
     contrastive_forward,
     contrastive_parameter_surgery,
@@ -116,6 +117,7 @@ def train_epoch(
             perform_backward = True
             optimizer.zero_grad()
 
+            # Forward pass model
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
                 (
                     model,
@@ -130,15 +132,21 @@ def train_epoch(
                 preds = model(inputs, meta["boxes"])
             elif cfg.MASK.ENABLE:
                 preds, labels = model(inputs)
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                preds, y_a, y_b, lam = model(inputs, labels)
             else:
                 preds = model(inputs)
+
+            # Get labels and compute the loss.
             if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
                 labels = torch.zeros(
                     preds.size(0), dtype=labels.dtype, device=labels.device
                 )
-
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
                 loss = partial_loss
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                loss = l.mean()
             else:
                 # Compute the loss.
                 loss = loss_fun(preds, labels)
@@ -387,6 +395,8 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                     yd_transform.view(batch_size, -1, 1),
                 )
                 preds = torch.sum(probs, 1)
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                preds = model(inputs, labels)
             else:
                 preds = model(inputs)
 
@@ -641,6 +651,12 @@ def train(cfg):
     else:
         writer = None
 
+    # Reinitialise classifier head if required
+    if cfg.MODEL.REINIT_HEAD:
+        print(f"Reinitialising head of model {cfg.MODEL.ARCH}...")
+        assert isinstance(model.head, ResNetBasicHead), "Head must be a ResNetBasicHead"
+        model.head.reset_weights()
+
     # Perform the training loop.
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
@@ -688,6 +704,7 @@ def train(cfg):
         loader.shuffle_dataset(train_loader, cur_epoch)
         if hasattr(train_loader.dataset, "_set_epoch_num"):
             train_loader.dataset._set_epoch_num(cur_epoch)
+
         # Train for one epoch.
         epoch_timer.epoch_tic()
         train_epoch(
