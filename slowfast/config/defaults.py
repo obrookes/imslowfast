@@ -238,6 +238,8 @@ _C.AUG.MANIFOLD_MIXUP = False
 
 _C.AUG.MANIFOLD_MIXUP_ALPHA = 1.0
 
+_C.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES = ""
+
 # ---------------------------------------------------------------------------- #
 # Data sampling options.
 # ---------------------------------------------------------------------------- #
