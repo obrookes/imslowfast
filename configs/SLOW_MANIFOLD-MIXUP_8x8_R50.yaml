@@ -20,6 +20,7 @@ DATA:
   ENSEMBLE_METHOD: max
 AUG:
   MANIFOLD_MIXUP: True
+  MANIFOLD_MIXUP_CLASS_FREQUENCIES: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq/panaf_seq_rev_class_freqs.json
 TAP:
   ENABLE: False
 TENSORBOARD:
@@ -37,12 +38,12 @@ NONLOCAL:
   GROUP: [[1], [1], [1], [1]]
   INSTANTIATION: dot_product
 BN:
-  USE_PRECISE_STATS: True
+  USE_PRECISE_STATS: False
   NUM_BATCHES_PRECISE: 200
 SOLVER:
   BASE_LR: 1e-1
   LR_POLICY: cosine
-  MAX_EPOCH: 10
+  MAX_EPOCH: 90
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
   WARMUP_EPOCHS: 1.0
@@ -72,4 +73,5 @@ NUM_GPUS: 8
 NUM_SHARDS: 1
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: .
+USE_SBATCH: True
+OUTPUT_DIR: model=slow-r50_method=manifold-mixup_ext=minority-lambdas
