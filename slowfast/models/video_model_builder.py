@@ -696,6 +696,8 @@ class ManifoldMixupResNet(nn.Module):
             with open(cfg.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES, "r") as f:
                 class_frequencies = json.load(f)
             self.class_proportions = self.calculate_class_proportions(class_frequencies)
+        else:
+            self.class_proportions = None
         self._construct_network(cfg)
 
         init_helper.init_weights(
