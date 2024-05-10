@@ -8,8 +8,8 @@ TRAIN:
   CHECKPOINT_TYPE: caffe2
   AUTO_RESUME: False
 DATA:
-  NUM_FRAMES: 8
-  SAMPLING_RATE: 48
+  NUM_FRAMES: 16
+  SAMPLING_RATE: 24
   TRAIN_JITTER_SCALES: [256, 320]
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
@@ -20,7 +20,6 @@ DATA:
   ENSEMBLE_METHOD: max
 AUG:
   MANIFOLD_MIXUP: True
-  MANIFOLD_MIXUP_CLASS_FREQUENCIES: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq/panaf_seq_rev_class_freqs.json
 TAP:
   ENABLE: False
 TENSORBOARD:
@@ -74,4 +73,4 @@ NUM_SHARDS: 1
 RNG_SEED: 0
 LOG_PERIOD: 1
 USE_SBATCH: True
-OUTPUT_DIR: model=slow-r50_method=manifold-mixup_ext=minority-lambdas
+OUTPUT_DIR: model=slow-r50_method=manifold-mixup_frames=16
