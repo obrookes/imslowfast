@@ -94,7 +94,10 @@ def train_epoch(
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if not isinstance(val[i], str):
+                            val[i] = val[i].cuda(non_blocking=True)
+                        else:
+                            continue
                 else:
                     meta[key] = val.cuda(non_blocking=True)
 
@@ -357,7 +360,10 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if not isinstance(val[i], str):
+                            val[i] = val[i].cuda(non_blocking=True)
+                        else:
+                            continue
                 else:
                     meta[key] = val.cuda(non_blocking=True)
             index = index.cuda()
