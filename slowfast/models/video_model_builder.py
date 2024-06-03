@@ -692,6 +692,7 @@ class ManifoldMixupResNet(nn.Module):
         self.num_pathways = 1
         self.manifold_mixup_alpha = cfg.AUG.MANIFOLD_MIXUP_ALPHA
         self.use_cuda = True if cfg.NUM_GPUS > 0 else False
+        self.use_triplets = cfg.AUG.MANIFOLD_MIXUP_TRIPLETS
         if cfg.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES != "":
             with open(cfg.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES, "r") as f:
                 class_frequencies = json.load(f)
@@ -913,6 +914,29 @@ class ManifoldMixupResNet(nn.Module):
         y_a, y_b = y, y[index]
         return mixed_x, y_a, y_b, lam
 
+    def mixup_data_triplet(self, x, y, alpha=1.0, use_cuda=False):
+        """Returns mixed inputs, triplets of targets, and lambda"""
+        if alpha > 0:
+            lam1 = torch.distributions.beta.Beta(alpha, alpha).sample((x.size(0), 1))
+            lam2 = torch.distributions.beta.Beta(alpha, alpha).sample((x.size(0), 1))
+            lam1 = lam1.to(x.device)
+            lam2 = lam2.to(x.device)
+        else:
+            lam1 = 1
+            lam2 = 1
+
+        batch_size = x.size()[0]
+        if use_cuda:
+            index1 = torch.randperm(batch_size).cuda()
+            index2 = torch.randperm(batch_size).cuda()
+        else:
+            index1 = torch.randperm(batch_size)
+            index2 = torch.randperm(batch_size)
+
+        mixed_x = lam1 * x + (1 - lam1) * x[index1, :] + lam2 * x[index2, :]
+        y_a, y_b, y_c = y, y[index1], y[index2]
+        return mixed_x, y_a, y_b, y_c, lam1, lam2
+
     def forward(self, x, labels):
         x = x[:]  # avoid pass by reference
         x = self.s1(x)
@@ -930,15 +954,22 @@ class ManifoldMixupResNet(nn.Module):
         x = torch.flatten(x, 1)
         # Mix the latent encodings
         if self.training:
-            x, y_a, y_b, lam = self.mixup_data(
-                x,
-                labels,
-                alpha=self.manifold_mixup_alpha,
-                use_cuda=self.use_cuda,
-                class_proportions=self.class_proportions,
-            )
-            x = self.projection(x)
-            return x, y_a, y_b, lam
+            if self.use_triplets:
+                x, y_a, y_b, y_c, lam1, lam2 = self.mixup_data_triplet(
+                    x, labels, alpha=self.manifold_mixup_alpha, use_cuda=self.use_cuda
+                )
+                x = self.projection(x)
+                return x, y_a, y_b, y_c, lam1, lam2
+            else:
+                x, y_a, y_b, lam = self.mixup_data(
+                    x,
+                    labels,
+                    alpha=self.manifold_mixup_alpha,
+                    use_cuda=self.use_cuda,
+                    class_proportions=self.class_proportions,
+                )
+                x = self.projection(x)
+                return x, y_a, y_b, lam
         else:
             x = self.projection(x)
             return x
