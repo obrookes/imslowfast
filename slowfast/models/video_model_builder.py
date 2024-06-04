@@ -899,12 +899,11 @@ class ManifoldMixupResNet(nn.Module):
         """Returns mixed inputs, pairs of targets, and lambda"""
         if class_proportions is not None:
             lam = self.calculate_lambdas(y, class_proportions)
-        if alpha > 0:
+        elif alpha > 0:
             lam = torch.distributions.beta.Beta(alpha, alpha).sample(((x.size(0)), 1))
-            lam = lam.to(x.device)
         else:
             lam = 1
-
+        lam = lam.to(x.device)
         batch_size = x.size()[0]
         if use_cuda:
             index = torch.randperm(batch_size).cuda()
