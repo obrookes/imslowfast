@@ -690,6 +690,7 @@ class ManifoldMixupResNet(nn.Module):
         self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
+        self.return_feats = cfg.TEST.RETURN_FEATS
         self.manifold_mixup_alpha = cfg.AUG.MANIFOLD_MIXUP_ALPHA
         self.use_cuda = True if cfg.NUM_GPUS > 0 else False
         self.use_triplets = cfg.AUG.MANIFOLD_MIXUP_TRIPLETS
@@ -971,8 +972,13 @@ class ManifoldMixupResNet(nn.Module):
                 x = self.projection(x)
                 return x, y_a, y_b, lam
         else:
-            x = self.projection(x)
-            return x
+            if self.return_feats:
+                feats = x
+                x = self.projection(x)
+                return (x, feats)
+            else:
+                x = self.projection(x)
+                return x
 
 
 @MODEL_REGISTRY.register()

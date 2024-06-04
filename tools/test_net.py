@@ -116,6 +116,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                 yd_transform.view(batchSize, -1, 1),
             )
             preds = torch.sum(probs, 1)
+        elif cfg.AUG.MANIFOLD_MIXUP:
+            out = model(inputs, labels)
         else:
             # Perform the forward pass.
             out = model(inputs)
