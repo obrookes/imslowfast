@@ -48,6 +48,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
     # Save feats
     if cfg.TEST.RETURN_FEATS:
+        all_preds = []
         all_feats = []
         all_names = []
 
@@ -123,9 +124,9 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             out = model(inputs)
         if cfg.TEST.RETURN_FEATS:
             preds, feats = out[0], out[1]
-            all_feats.append(feats)
 
-            # TODO: Append labels too...
+            all_preds.append(preds)
+            all_feats.append(feats)
             all_names.extend(meta["video_name"])
 
         # Gather all the predictions across all the devices to perform ensemble.
@@ -166,7 +167,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
     test_meter.finalize_metrics()
     if cfg.TEST.RETURN_FEATS:
-        return test_meter, all_names, torch.cat(all_feats, dim=0), all_labels
+        return test_meter, all_names, all_preds, torch.cat(all_feats, dim=0), all_labels
     else:
         return test_meter
 
@@ -257,7 +258,7 @@ def test(cfg):
 
         # # Perform multi-view test on the entire dataset.
         if cfg.TEST.RETURN_FEATS:
-            test_meter, names, feats, labels = perform_test(
+            test_meter, names, preds, feats, labels = perform_test(
                 test_loader, model, test_meter, cfg, writer
             )
         else:
@@ -267,7 +268,7 @@ def test(cfg):
             writer.close()
 
     # Dict for storing features and labels
-    feats = {"names": names, "feats": feats, "labels": labels}
+    feats = {"names": names, "preds": preds, "feats": feats, "labels": labels}
 
     # Save the output features
     if cfg.TEST.RETURN_FEATS:
