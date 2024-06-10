@@ -250,6 +250,7 @@ class ResNetBasicHead(nn.Module):
         self.local_projection_modules = []
         self.predictors = nn.ModuleList()
         self.l2norm_feats = False
+        self.return_feats = cfg.TEST.RETURN_FEATS
 
         for pathway in range(self.num_pathways):
             if pool_size[pathway] is None:
@@ -344,6 +345,7 @@ class ResNetBasicHead(nn.Module):
             and self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
         ):
             x = x.view(x.shape[0], -1)
+
         x_proj = self.projection(x)
 
         time_projs = []
@@ -360,9 +362,12 @@ class ResNetBasicHead(nn.Module):
                 x_proj = x_proj.mean([1, 2, 3])
 
         x_proj = x_proj.view(x_proj.shape[0], -1)
+        x = x.view(x.shape[0], -1)
 
         if time_projs:
             return [x_proj] + time_projs
+        elif self.return_feats:
+            return (x_proj, x)
         else:
             return x_proj
 
