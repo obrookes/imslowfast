@@ -332,15 +332,15 @@ class Kinetics(torch.utils.data.Dataset):
                 num_frames,
                 temporal_sample_index,
                 self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
-                video_meta=self._video_meta[index]
-                if len(self._video_meta) < 5e6
-                else {},  # do not cache on huge datasets
+                video_meta=(
+                    self._video_meta[index] if len(self._video_meta) < 5e6 else {}
+                ),  # do not cache on huge datasets
                 target_fps=target_fps,
                 backend=self.cfg.DATA.DECODING_BACKEND,
                 use_offset=self.cfg.DATA.USE_OFFSET_SAMPLING,
-                max_spatial_scale=min_scale[0]
-                if all(x == min_scale[0] for x in min_scale)
-                else 0,  # if self.mode in ["test"] else 0,
+                max_spatial_scale=(
+                    min_scale[0] if all(x == min_scale[0] for x in min_scale) else 0
+                ),  # if self.mode in ["test"] else 0,
                 time_diff_prob=self.p_convert_dt if self.mode in ["train"] else 0.0,
                 temporally_rnd_clips=True,
                 min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
@@ -437,9 +437,11 @@ class Kinetics(torch.utils.data.Dataset):
                         inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
                         aspect_ratio=relative_aspect,
                         scale=relative_scales,
-                        motion_shift=self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-                        if self.mode in ["train"]
-                        else False,
+                        motion_shift=(
+                            self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
+                            if self.mode in ["train"]
+                            else False
+                        ),
                     )
 
                     if self.rand_erase:
@@ -469,7 +471,13 @@ class Kinetics(torch.utils.data.Dataset):
             if self.cfg.DATA.DUMMY_LOAD:
                 if self.dummy_output is None:
                     self.dummy_output = (frames, label, index, time_idx, {})
-            return frames, label, index, time_idx, {}
+            return (
+                frames,
+                label,
+                index,
+                time_idx,
+                {"video_name": self._path_to_videos[index].split("/")[-1]},
+            )
         else:
             logger.warning(
                 "Failed to fetch video after {} retries.".format(self._num_retries)

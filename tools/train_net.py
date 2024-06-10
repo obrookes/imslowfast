@@ -94,7 +94,10 @@ def train_epoch(
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if not isinstance(val[i], str):
+                            val[i] = val[i].cuda(non_blocking=True)
+                        else:
+                            continue
                 else:
                     meta[key] = val.cuda(non_blocking=True)
 
@@ -133,7 +136,14 @@ def train_epoch(
             elif cfg.MASK.ENABLE:
                 preds, labels = model(inputs)
             elif cfg.AUG.MANIFOLD_MIXUP:
-                preds, y_a, y_b, lam = model(inputs, labels)
+                if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
+                    preds, y_a, y_b, lam = model(inputs, labels)
+                elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                    preds, y_a, y_b, y_c, lam1, lam2 = model(inputs, labels)
+                else:
+                    raise NotImplementedError(
+                        "Manifold Mixup requires pairs or triplets"
+                    )
             else:
                 preds = model(inputs)
 
@@ -144,8 +154,15 @@ def train_epoch(
                 )
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
                 loss = partial_loss
-            elif cfg.AUG.MANIFOLD_MIXUP:
+            elif cfg.AUG.MANIFOLD_MIXUP_PAIRS:
                 l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                loss = l.mean()
+            elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                l = (
+                    lam1 * loss_fun(preds, y_a)
+                    + lam2 * loss_fun(preds, y_b)
+                    + (1 - lam1 - lam2) * loss_fun(preds, y_c)
+                )
                 loss = l.mean()
             else:
                 # Compute the loss.
@@ -343,7 +360,10 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if not isinstance(val[i], str):
+                            val[i] = val[i].cuda(non_blocking=True)
+                        else:
+                            continue
                 else:
                     meta[key] = val.cuda(non_blocking=True)
             index = index.cuda()

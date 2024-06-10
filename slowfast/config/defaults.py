@@ -238,6 +238,12 @@ _C.AUG.MANIFOLD_MIXUP = False
 
 _C.AUG.MANIFOLD_MIXUP_ALPHA = 1.0
 
+_C.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES = ""
+
+_C.AUG.MANIFOLD_MIXUP_PAIRS = True
+
+_C.AUG.MANIFOLD_MIXUP_TRIPLETS = False
+
 # ---------------------------------------------------------------------------- #
 # Data sampling options.
 # ---------------------------------------------------------------------------- #
@@ -300,11 +306,11 @@ _C.TEST.CHECKPOINT_FILE_PATH = ""
 
 # Number of clips to sample from a video uniformly for aggregating the
 # prediction results.
-_C.TEST.NUM_ENSEMBLE_VIEWS = 10
+_C.TEST.NUM_ENSEMBLE_VIEWS = 1
 
 # Number of crops to sample from a frame spatially for aggregating the
 # prediction results.
-_C.TEST.NUM_SPATIAL_CROPS = 3
+_C.TEST.NUM_SPATIAL_CROPS = 1
 
 # Checkpoint types include `caffe2` or `pytorch`.
 _C.TEST.CHECKPOINT_TYPE = "pytorch"
@@ -312,6 +318,8 @@ _C.TEST.CHECKPOINT_TYPE = "pytorch"
 _C.TEST.SAVE_RESULTS_PATH = ""
 
 _C.TEST.NUM_TEMPORAL_CLIPS = []
+
+_C.TEST.RETURN_FEATS = False
 # -----------------------------------------------------------------------------
 # ResNet options
 # -----------------------------------------------------------------------------

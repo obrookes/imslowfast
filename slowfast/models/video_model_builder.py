@@ -2,7 +2,7 @@
 
 
 """Video models."""
-
+import json
 import math
 from functools import partial
 import torch
@@ -690,8 +690,16 @@ class ManifoldMixupResNet(nn.Module):
         self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
+        self.return_feats = cfg.TEST.RETURN_FEATS
         self.manifold_mixup_alpha = cfg.AUG.MANIFOLD_MIXUP_ALPHA
         self.use_cuda = True if cfg.NUM_GPUS > 0 else False
+        self.use_triplets = cfg.AUG.MANIFOLD_MIXUP_TRIPLETS
+        if cfg.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES != "":
+            with open(cfg.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES, "r") as f:
+                class_frequencies = json.load(f)
+            self.class_proportions = self.calculate_class_proportions(class_frequencies)
+        else:
+            self.class_proportions = None
         self._construct_network(cfg)
 
         init_helper.init_weights(
@@ -858,14 +866,44 @@ class ManifoldMixupResNet(nn.Module):
 
         self.projection = self.head.projection
 
-    def mixup_data(self, x, y, alpha=1.0, use_cuda=False):
+    def calculate_class_proportions(self, class_frequencies):
+        """
+        Calculate the proportions of each class based on the class frequencies
+        in the dataset.
+        """
+        # Calculate the total frequency
+        total_freq = sum(class_frequencies.values())
+
+        # Calculate the proportions
+        proportions = [freq / total_freq for freq in class_frequencies.values()]
+
+        return proportions
+
+    def calculate_lambdas(self, y, class_frequencies):
+        """
+        Calculate the lambda values for the mixup method based on the class frequencies
+        in the dataset. Lambda values are additive in this case.
+        """
+        lambdas = []
+        # Get non zero indices of multi-hot encoded labels
+        for i in range(y.shape[0]):
+            indices = torch.nonzero(y[i], as_tuple=True)[0]
+            # Calculate the lambda values for each sample
+            lam = 0
+            for index in indices:
+                lam += class_frequencies[index.item()]
+            lambdas.append([lam])
+        return torch.tensor(lambdas)
+
+    def mixup_data(self, x, y, alpha=1.0, use_cuda=False, class_proportions=None):
         """Returns mixed inputs, pairs of targets, and lambda"""
-        if alpha > 0:
+        if class_proportions is not None:
+            lam = self.calculate_lambdas(y, class_proportions)
+        elif alpha > 0:
             lam = torch.distributions.beta.Beta(alpha, alpha).sample(((x.size(0)), 1))
-            lam = lam.to(x.device)
         else:
             lam = 1
-
+        lam = lam.to(x.device)
         batch_size = x.size()[0]
         if use_cuda:
             index = torch.randperm(batch_size).cuda()
@@ -875,6 +913,29 @@ class ManifoldMixupResNet(nn.Module):
         mixed_x = lam * x + (1 - lam) * x[index, :]
         y_a, y_b = y, y[index]
         return mixed_x, y_a, y_b, lam
+
+    def mixup_data_triplet(self, x, y, alpha=1.0, use_cuda=False):
+        """Returns mixed inputs, triplets of targets, and lambda"""
+        if alpha > 0:
+            lam1 = torch.distributions.beta.Beta(alpha, alpha).sample((x.size(0), 1))
+            lam2 = torch.distributions.beta.Beta(alpha, alpha).sample((x.size(0), 1))
+            lam1 = lam1.to(x.device)
+            lam2 = lam2.to(x.device)
+        else:
+            lam1 = 1
+            lam2 = 1
+
+        batch_size = x.size()[0]
+        if use_cuda:
+            index1 = torch.randperm(batch_size).cuda()
+            index2 = torch.randperm(batch_size).cuda()
+        else:
+            index1 = torch.randperm(batch_size)
+            index2 = torch.randperm(batch_size)
+
+        mixed_x = lam1 * x + (1 - lam1) * x[index1, :] + lam2 * x[index2, :]
+        y_a, y_b, y_c = y, y[index1], y[index2]
+        return mixed_x, y_a, y_b, y_c, lam1, lam2
 
     def forward(self, x, labels):
         x = x[:]  # avoid pass by reference
@@ -893,14 +954,30 @@ class ManifoldMixupResNet(nn.Module):
         x = torch.flatten(x, 1)
         # Mix the latent encodings
         if self.training:
-            x, y_a, y_b, lam = self.mixup_data(
-                x, labels, alpha=self.manifold_mixup_alpha, use_cuda=self.use_cuda
-            )
-            x = self.projection(x)
-            return x, y_a, y_b, lam
+            if self.use_triplets:
+                x, y_a, y_b, y_c, lam1, lam2 = self.mixup_data_triplet(
+                    x, labels, alpha=self.manifold_mixup_alpha, use_cuda=self.use_cuda
+                )
+                x = self.projection(x)
+                return x, y_a, y_b, y_c, lam1, lam2
+            else:
+                x, y_a, y_b, lam = self.mixup_data(
+                    x,
+                    labels,
+                    alpha=self.manifold_mixup_alpha,
+                    use_cuda=self.use_cuda,
+                    class_proportions=self.class_proportions,
+                )
+                x = self.projection(x)
+                return x, y_a, y_b, lam
         else:
-            x = self.projection(x)
-            return x
+            if self.return_feats:
+                feats = x
+                x = self.projection(x)
+                return (x, feats)
+            else:
+                x = self.projection(x)
+                return x
 
 
 @MODEL_REGISTRY.register()

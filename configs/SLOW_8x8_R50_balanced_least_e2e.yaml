@@ -4,10 +4,9 @@ TRAIN:
   BATCH_SIZE: 16
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 1
-  CHECKPOINT_FILE_PATH: model=slow_r50_ds=panaf_seq/checkpoints/checkpoint_epoch_00090.pyth
-  CHECKPOINT_TYPE: pytorch
-  AUTO_RESUME: True
-  CHECKPOINT_EPOCH_RESET: False
+  CHECKPOINT_FILE_PATH: SLOWFAST_8x8_R50.pkl
+  CHECKPOINT_TYPE: caffe2
+  AUTO_RESUME: False
 DATA:
   NUM_FRAMES: 16
   SAMPLING_RATE: 24
@@ -55,11 +54,11 @@ MODEL:
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
   DETACH_FINAL_FC: False
-  DETACH_HEAD: True
-  REINIT_HEAD: True
+  DETACH_HEAD: False
+  REINIT_HEAD: False
 SAMPLING:
   BALANCED: True
-  BALANCE_TYPE: random
+  BALANCE_TYPE: least_sampled
 TEST:
   ENABLE: True
   DATASET: kinetics
@@ -72,4 +71,4 @@ NUM_SHARDS: 1
 USE_SBATCH: True
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_sampler=balanced_random'
+OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_sampler=balanced_least_e2e'
