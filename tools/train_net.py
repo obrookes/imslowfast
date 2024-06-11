@@ -154,16 +154,17 @@ def train_epoch(
                 )
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
                 loss = partial_loss
-            elif cfg.AUG.MANIFOLD_MIXUP_PAIRS:
-                l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
-                loss = l.mean()
-            elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
-                l = (
-                    lam1 * loss_fun(preds, y_a)
-                    + lam2 * loss_fun(preds, y_b)
-                    + (1 - lam1 - lam2) * loss_fun(preds, y_c)
-                )
-                loss = l.mean()
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
+                    l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                    loss = l.mean()
+                elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                    l = (
+                        lam1 * loss_fun(preds, y_a)
+                        + lam2 * loss_fun(preds, y_b)
+                        + (1 - lam1 - lam2) * loss_fun(preds, y_c)
+                    )
+                    loss = l.mean()
             else:
                 # Compute the loss.
                 loss = loss_fun(preds, labels)
