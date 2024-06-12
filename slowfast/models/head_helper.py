@@ -362,7 +362,7 @@ class ResNetBasicHead(nn.Module):
                 x_proj = x_proj.mean([1, 2, 3])
 
         x_proj = x_proj.view(x_proj.shape[0], -1)
-        x = x.view(x.shape[0], -1)
+        x = x.reshape(x.shape[0], -1)
 
         if time_projs:
             return [x_proj] + time_projs
