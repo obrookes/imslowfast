@@ -475,7 +475,13 @@ class Tap(torch.utils.data.Dataset):
             if self.cfg.DATA.DUMMY_LOAD:
                 if self.dummy_output is None:
                     self.dummy_output = (frames, label, index, time_idx, {})
-            return frames, label, index, time_idx, {}
+            return (
+                frames,
+                label,
+                index,
+                time_idx,
+                {"video_name": self._path_to_videos[index].split("/")[-1]},
+            )
         else:
             logger.warning(
                 "Failed to fetch video after {} retries.".format(self._num_retries)
