@@ -119,6 +119,13 @@ def _get_model_analysis_input(cfg, use_train_input):
                 cfg.DATA.TEST_CROP_SIZE,
                 cfg.DATA.TEST_CROP_SIZE,
             )
+        elif cfg.TAP.ENABLE:
+            input_tensors = torch.rand(
+                rgb_dimension,
+                cfg.TAP.NUM_CLIPS * cfg.TAP.NUM_FRAMES,
+                cfg.DATA.TRAIN_CROP_SIZE,
+                cfg.DATA.TRAIN_CROP_SIZE,
+            )
         else:
             input_tensors = torch.rand(
                 rgb_dimension,
