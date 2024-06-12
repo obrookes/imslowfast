@@ -699,6 +699,7 @@ class TapResNet(nn.Module):
         )
         self.num_clips = cfg.TAP.NUM_CLIPS
         self.num_frames = cfg.TAP.NUM_FRAMES
+        self.return_cas = cfg.TEST.RETURN_CAS
 
     def _construct_network(self, cfg):
         """
@@ -898,7 +899,13 @@ class TapResNet(nn.Module):
             cas, k=max(1, int(cas.shape[-2]) // 8), dim=-2
         )
         video_score = torch.mean(topk_val, dim=-2)
-        return video_score
+
+        if self.training:
+            return video_score
+        elif self.return_cas:
+            return video_score, cas
+        else:
+            return video_score
 
 
 @MODEL_REGISTRY.register()
