@@ -180,7 +180,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             test_meter,
             all_names,
             all_preds,
-            torch.stack(all_cas, dim=1).squeeze(dim=0),
+            torch.cat(all_cas, dim=0),
             all_labels,
         )
     else:
