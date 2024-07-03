@@ -4,7 +4,11 @@ TRAIN:
   BATCH_SIZE: 32
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
+<<<<<<< HEAD
   CHECKPOINT_FILE_PATH: model=slow_r50_ds=panaf_seq_with_negatives/checkpoints/checkpoint_epoch_00100.pyth
+=======
+  CHECKPOINT_FILE_PATH: logs/model=slow-r50_method=manifold-mixup_triplets/checkpoints/checkpoint_epoch_00200.pyth
+>>>>>>> origin/main
   CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
 DATA:
@@ -65,4 +69,8 @@ NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
 USE_SBATCH: True
+<<<<<<< HEAD
 OUTPUT_DIR: model=slow-50_w-negatives_method=tap8x8_train
+=======
+OUTPUT_DIR: model=slow-50_method=tap4x8_ext=manifold_mixup_triplets
+>>>>>>> origin/main

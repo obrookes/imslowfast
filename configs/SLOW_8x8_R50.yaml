@@ -1,9 +1,15 @@
 TRAIN:
   ENABLE: True
   DATASET: kinetics
+<<<<<<< HEAD
   BATCH_SIZE: 96
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
+=======
+  BATCH_SIZE: 128
+  EVAL_PERIOD: 1
+  CHECKPOINT_PERIOD: 100
+>>>>>>> origin/main
   CHECKPOINT_FILE_PATH: SLOWONLY_8x8_R50.pkl
   CHECKPOINT_TYPE: caffe2
   AUTO_RESUME: False
@@ -14,7 +20,11 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
+<<<<<<< HEAD
   PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq
+=======
+  PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq/standard_with_negatives
+>>>>>>> origin/main
   PATH_PREFIX: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/videos/original
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
@@ -40,7 +50,11 @@ BN:
 SOLVER:
   BASE_LR: 2.5e-1
   LR_POLICY: cosine
+<<<<<<< HEAD
   MAX_EPOCH: 25
+=======
+  MAX_EPOCH: 200
+>>>>>>> origin/main
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
   WARMUP_EPOCHS: 5.0
@@ -56,7 +70,11 @@ MODEL:
 TEST:
   ENABLE: True
   DATASET: kinetics
+<<<<<<< HEAD
   BATCH_SIZE: 96
+=======
+  BATCH_SIZE: 128
+>>>>>>> origin/main
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
@@ -65,4 +83,8 @@ NUM_SHARDS: 1
 USE_SBATCH: True
 RNG_SEED: 0
 LOG_PERIOD: 1
+<<<<<<< HEAD
 OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq'
+=======
+OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_with_negatives'
+>>>>>>> origin/main

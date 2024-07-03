@@ -1,7 +1,11 @@
 TRAIN:
   ENABLE: True
   DATASET: tap
+<<<<<<< HEAD
   BATCH_SIZE: 96
+=======
+  BATCH_SIZE: 32
+>>>>>>> origin/main
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   CHECKPOINT_FILE_PATH: SLOWONLY_8x8_R50.pkl
@@ -56,7 +60,11 @@ MODEL:
 TEST:
   ENABLE: True
   DATASET: tap
+<<<<<<< HEAD
   BATCH_SIZE: 96
+=======
+  BATCH_SIZE: 32
+>>>>>>> origin/main
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
@@ -64,4 +72,8 @@ NUM_GPUS: 8
 NUM_SHARDS: 1
 RNG_SEED: 0
 USE_SBATCH: True
+<<<<<<< HEAD
 OUTPUT_DIR: model=slow-50-tap
+=======
+OUTPUT_DIR: model=slow-50_method=tap8x8
+>>>>>>> origin/main

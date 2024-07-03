@@ -1,21 +1,18 @@
 TRAIN:
-  ENABLE: False
-  DATASET: tap
-  BATCH_SIZE: 32
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 16
   EVAL_PERIOD: 1
-  CHECKPOINT_PERIOD: 1
-<<<<<<< HEAD
-  CHECKPOINT_FILE_PATH: model=slow_r50_ds=panaf_seq_with_negatives/checkpoints/checkpoint_epoch_00100.pyth
-=======
-  CHECKPOINT_FILE_PATH: logs/model=slow_r50_ds=panaf_seq/checkpoints/checkpoint_epoch_00090.pyth
->>>>>>> origin/main
+  CHECKPOINT_PERIOD: 20
+  CHECKPOINT_FILE_PATH: model=slow_r50_ds=panaf_seq/checkpoints/checkpoint_epoch_00090.pyth
   CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
+  CHECKPOINT_EPOCH_RESET: True
 DATA:
-  NUM_FRAMES: 8
-  SAMPLING_RATE: 8
+  NUM_FRAMES: 16
+  SAMPLING_RATE: 24
   TRAIN_JITTER_SCALES: [256, 320]
-  TRAIN_CROP_SIZE: 224
+  TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
   PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq
@@ -23,9 +20,9 @@ DATA:
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
 TAP:
+  ENABLE: False
+TENSORBOARD:
   ENABLE: True
-  NUM_CLIPS: 4
-  NUM_FRAMES: 8
 RESNET:
   ZERO_INIT_FINAL_BN: True
   WIDTH_PER_GROUP: 64
@@ -39,38 +36,40 @@ NONLOCAL:
   GROUP: [[1], [1], [1], [1]]
   INSTANTIATION: dot_product
 BN:
-  USE_PRECISE_STATS: False
+  USE_PRECISE_STATS: True
   NUM_BATCHES_PRECISE: 200
 SOLVER:
-  BASE_LR: 1e-1
+  BASE_LR: 1e-3
   LR_POLICY: cosine
-  MAX_EPOCH: 100
+  MAX_EPOCH: 200
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
-  WARMUP_EPOCHS: 10.0
-  WARMUP_START_LR: 1e-2
+  WARMUP_EPOCHS: 5.0
+  WARMUP_START_LR: 1e-4
   OPTIMIZING_METHOD: sgd
 MODEL:
   NUM_CLASSES: 14
   ARCH: slow
-  MODEL_NAME: TapResNet
+  MODEL_NAME: ResNet
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
+  DETACH_FINAL_FC: False
+  DETACH_HEAD: True
+  REINIT_HEAD: True
+SAMPLING:
+  BALANCED: True
+  BALANCE_TYPE: cycle
 TEST:
   ENABLE: True
-  DATASET: tap
-  BATCH_SIZE: 32
-  RETURN_CAS: True
+  DATASET: kinetics
+  BATCH_SIZE: 16
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
 NUM_GPUS: 1
 NUM_SHARDS: 1
-RNG_SEED: 0
 USE_SBATCH: True
-<<<<<<< HEAD
-OUTPUT_DIR: model=slow-50_w-negatives_method=tap4x8_train
-=======
-OUTPUT_DIR: model=slow-50_method=tap4x8_train
->>>>>>> origin/main
+RNG_SEED: 0
+LOG_PERIOD: 1
+OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_sampler=balanced_cycle'
