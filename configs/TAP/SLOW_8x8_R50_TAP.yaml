@@ -1,11 +1,7 @@
 TRAIN:
   ENABLE: True
   DATASET: tap
-<<<<<<< HEAD
   BATCH_SIZE: 96
-=======
-  BATCH_SIZE: 32
->>>>>>> origin/main
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   CHECKPOINT_FILE_PATH: SLOWONLY_8x8_R50.pkl
