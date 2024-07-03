@@ -4,7 +4,7 @@ TRAIN:
   BATCH_SIZE: 32
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
-  CHECKPOINT_FILE_PATH: logs/model=slow_r50_ds=panaf_seq/checkpoints/checkpoint_epoch_00090.pyth
+  CHECKPOINT_FILE_PATH: model=slow_r50_ds=panaf_seq_with_negatives/checkpoints/checkpoint_epoch_00100.pyth
   CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
 DATA:
@@ -65,4 +65,4 @@ NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
 USE_SBATCH: True
-OUTPUT_DIR: model=slow-50_method=tap4x8_train
+OUTPUT_DIR: model=slow-50_w-negatives_method=tap4x8_train
