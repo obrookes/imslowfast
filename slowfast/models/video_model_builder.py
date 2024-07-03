@@ -700,6 +700,7 @@ class TapResNet(nn.Module):
         self.num_clips = cfg.TAP.NUM_CLIPS
         self.num_frames = cfg.TAP.NUM_FRAMES
         self.return_cas = cfg.TEST.RETURN_CAS
+        self.return_feats = cfg.TEST.RETURN_FEATS
 
     def _construct_network(self, cfg):
         """
@@ -876,7 +877,7 @@ class TapResNet(nn.Module):
         # Reshape tensor to re-establish clips [B, C, M, T // M, H, W]
         x[0] = x[0].reshape((B, C, self.num_clips, T // self.num_clips, H, W))
 
-        cas = []
+        cas, feats = [], []
 
         for c in enumerate(x[0]):
             x = self.s1([c[1].permute(1, 0, 2, 3, 4)])
@@ -888,11 +889,15 @@ class TapResNet(nn.Module):
             x = self.s3(y)
             x = self.s4(x)
             x = self.s5(x)
-            x = self.head(x)
+            x, f = self.head(x)
             cas.append(x)
+            feats.append(f)
 
         # Stack the class activation maps
         cas = torch.stack(cas)
+
+        # Stack the features
+        feats = torch.stack(feats)
 
         # Get video-level prediction as per MIL approach
         topk_val, topk_indices = torch.topk(
@@ -902,7 +907,9 @@ class TapResNet(nn.Module):
 
         if self.training:
             return video_score
-        elif self.return_cas:
+        elif self.return_feats and self.return_cas:
+            return video_score, feats, cas
+        elif self.return_cas and not self.return_feats:
             return video_score, cas
         else:
             return video_score
