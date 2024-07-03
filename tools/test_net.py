@@ -299,10 +299,16 @@ def test(cfg):
             writer.close()
 
     # Dict for storing features and labels
-    if cfg.TEST.RETURN_FEATS:
+    if cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
         feats = {"names": names, "preds": preds, "feats": feats, "labels": labels}
-    if cfg.TAP.ENABLE and cfg.TEST.RETURN_CAS:
-        feats = {"names": names, "preds": preds, "cas": cas, "labels": labels}
+    if cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
+        feats = {
+            "names": names,
+            "preds": preds,
+            "cas": cas,
+            "feats": feats,
+            "labels": labels,
+        }
 
     # Save the output features
     if cfg.TEST.RETURN_FEATS or (cfg.TAP.ENABLE and cfg.TEST.RETURN_CAS):
