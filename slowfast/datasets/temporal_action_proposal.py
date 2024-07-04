@@ -346,6 +346,8 @@ class Tap(torch.utils.data.Dataset):
                 min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
                 tap_enabled=self.cfg.TAP.ENABLE,
+                tap_sliding_window=self.cfg.TAP.SLIDING_WINDOW,
+                tap_overlap=self.cfg.TAP.OVERLAP,
                 tap_num_clips=self.cfg.TAP.NUM_CLIPS,
                 tap_num_frames=self.cfg.TAP.NUM_FRAMES,
             )
