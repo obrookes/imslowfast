@@ -215,8 +215,11 @@ def train_epoch(
                     )
                     loss = l.mean()
             elif cfg.DATA.PSEUDO_LABELS:
-                loss = calculate_loss_with_pseudo_labels(
-                    preds, labels, loss_fun, pseudo_labels
+                loss = (
+                    calculate_loss_with_pseudo_labels(
+                        preds, labels, loss_fun, pseudo_labels
+                    )
+                    * cfg.DATA.PSEUDO_LABELS_WEIGHT
                 ) + loss_fun(preds, labels)
             else:
                 # Compute the loss.
