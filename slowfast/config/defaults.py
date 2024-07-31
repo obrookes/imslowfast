@@ -99,6 +99,10 @@ _C.TAP.NUM_CLIPS = 4
 
 _C.TAP.NUM_FRAMES = 4
 
+_C.TAP.SLIDING_WINDOW = False
+
+_C.TAP.OVERLAP = None
+
 # ---------------------------------------------------------------------------- #
 # Batch norm options
 # ---------------------------------------------------------------------------- #
@@ -240,7 +244,7 @@ _C.AUG.MANIFOLD_MIXUP_ALPHA = 1.0
 
 _C.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES = ""
 
-_C.AUG.MANIFOLD_MIXUP_PAIRS = True
+_C.AUG.MANIFOLD_MIXUP_PAIRS = False
 
 _C.AUG.MANIFOLD_MIXUP_TRIPLETS = False
 
@@ -320,6 +324,8 @@ _C.TEST.SAVE_RESULTS_PATH = ""
 _C.TEST.NUM_TEMPORAL_CLIPS = []
 
 _C.TEST.RETURN_FEATS = False
+
+_C.TEST.RETURN_CAS = False
 # -----------------------------------------------------------------------------
 # ResNet options
 # -----------------------------------------------------------------------------
@@ -841,6 +847,10 @@ _C.DATA.IN_VAL_CROP_RATIO = 0.875  # 224/256 = 0.875
 
 # don't use real video for kinetics.py
 _C.DATA.DUMMY_LOAD = False
+
+_C.DATA.PSEUDO_LABELS = ""
+
+_C.DATA.PSEUDO_LABELS_WEIGHT = 1.0
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options

@@ -4,6 +4,7 @@
 """Train a video classification model."""
 
 import math
+import pickle as pkl
 import numpy as np
 import pprint
 import torch
@@ -31,6 +32,53 @@ from slowfast.utils.multigrid import MultigridSchedule
 logger = logging.get_logger(__name__)
 
 
+def inverse_mapping(x, low=1, high=5):
+    # Ensure x is within the valid range
+    x = torch.clamp(x, low, high)
+
+    # Calculate the inverse mapping
+    return low + high - x
+
+
+def calculate_loss_with_pseudo_labels(preds, labels, loss_func, store_dict):
+    """
+    Calculate the loss between the predictions and the original labels using pseudo labels.
+
+    Args:
+    preds (torch.Tensor): Tensor of model predictions.
+    labels (torch.Tensor): Tensor of original labels.
+    store_dict (dict): Dictionary containing pseudo labels for each original label.
+
+    Returns:
+    torch.Tensor: Loss value.
+    """
+    total_loss = 0
+    for i in range(len(labels)):
+        original_label = labels[i].cpu().numpy()
+        num_labels_present = torch.tensor(int(sum(original_label)), dtype=int)
+        if num_labels_present > 0:
+            # Select k random pseudo labels
+            pseudo_labels = store_dict[str(original_label)]["pseudo_labels"]
+            # pseudo_probs = store_dict[str(original_label)]["probs"]
+            idxs = np.random.choice(
+                len(pseudo_labels),
+                int(inverse_mapping(num_labels_present)),
+                replace=False,
+            )
+            # TODO: weight losses by chained sequence probability
+            for idx in idxs:
+                loss = loss_func(
+                    preds[i],
+                    torch.tensor(
+                        pseudo_labels[idx], dtype=torch.float32, device=preds[i].device
+                    ),
+                )
+                total_loss += loss
+        else:
+            continue
+    return total_loss
+
+
 def train_epoch(
     train_loader,
     model,
@@ -40,6 +88,7 @@ def train_epoch(
     cur_epoch,
     cfg,
     writer=None,
+    pseudo_labels=None,
 ):
     """
     Perform the video training for one epoch.
@@ -154,16 +203,24 @@ def train_epoch(
                 )
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
                 loss = partial_loss
-            elif cfg.AUG.MANIFOLD_MIXUP_PAIRS:
-                l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
-                loss = l.mean()
-            elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
-                l = (
-                    lam1 * loss_fun(preds, y_a)
-                    + lam2 * loss_fun(preds, y_b)
-                    + (1 - lam1 - lam2) * loss_fun(preds, y_c)
-                )
-                loss = l.mean()
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
+                    l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                    loss = l.mean()
+                elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                    l = (
+                        lam1 * loss_fun(preds, y_a)
+                        + lam2 * loss_fun(preds, y_b)
+                        + (1 - lam1 - lam2) * loss_fun(preds, y_c)
+                    )
+                    loss = l.mean()
+            elif cfg.DATA.PSEUDO_LABELS:
+                loss = (
+                    calculate_loss_with_pseudo_labels(
+                        preds, labels, loss_fun, pseudo_labels
+                    )
+                    * cfg.DATA.PSEUDO_LABELS_WEIGHT
+                ) + loss_fun(preds, labels)
             else:
                 # Compute the loss.
                 loss = loss_fun(preds, labels)
@@ -725,6 +782,13 @@ def train(cfg):
         if hasattr(train_loader.dataset, "_set_epoch_num"):
             train_loader.dataset._set_epoch_num(cur_epoch)
 
+        # Pseudo labels
+        if cfg.DATA.PSEUDO_LABELS:
+            with open(cfg.DATA.PSEUDO_LABELS, "rb") as f:
+                pseudo_labels = pkl.load(f)
+        else:
+            pseudo_labels = None
+
         # Train for one epoch.
         epoch_timer.epoch_tic()
         train_epoch(
@@ -736,6 +800,7 @@ def train(cfg):
             cur_epoch,
             cfg,
             writer,
+            pseudo_labels,
         )
         epoch_timer.epoch_toc()
         logger.info(

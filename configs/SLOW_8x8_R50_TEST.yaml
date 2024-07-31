@@ -1,12 +1,12 @@
 TRAIN:
-  ENABLE: True
+  ENABLE:  True
   DATASET: kinetics
-  BATCH_SIZE: 128
+  BATCH_SIZE: 96
   EVAL_PERIOD: 1
-  CHECKPOINT_PERIOD: 100
-  CHECKPOINT_FILE_PATH: SLOWONLY_8x8_R50.pkl
-  CHECKPOINT_TYPE: caffe2
-  AUTO_RESUME: False
+  CHECKPOINT_PERIOD: 1
+  CHECKPOINT_FILE_PATH: model=slow-50-tap/model=slow_r50_ds=panaf_seq_with_negatives/checkpoint_epoch_00100.pyth
+  CHECKPOINT_TYPE: pytorch
+  AUTO_RESUME: True
 DATA:
   NUM_FRAMES: 16
   SAMPLING_RATE: 24
@@ -14,7 +14,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq/standard_with_negatives
+  PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq
   PATH_PREFIX: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/videos/original
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
@@ -40,7 +40,7 @@ BN:
 SOLVER:
   BASE_LR: 2.5e-1
   LR_POLICY: cosine
-  MAX_EPOCH: 200
+  MAX_EPOCH: 100
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
   WARMUP_EPOCHS: 5.0
@@ -56,13 +56,16 @@ MODEL:
 TEST:
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 128
+  BATCH_SIZE: 96
+  NUM_ENSEMBLE_VIEWS: 1
+  NUM_SPATIAL_CROPS: 1
+  RETURN_FEATS: True
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
-NUM_GPUS: 8
+NUM_GPUS: 1
 NUM_SHARDS: 1
 USE_SBATCH: True
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_with_negatives'
+OUTPUT_DIR: 'model=slow_r50_type=return_val_feats'

@@ -346,6 +346,8 @@ class Tap(torch.utils.data.Dataset):
                 min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
                 tap_enabled=self.cfg.TAP.ENABLE,
+                tap_sliding_window=self.cfg.TAP.SLIDING_WINDOW,
+                tap_overlap=self.cfg.TAP.OVERLAP,
                 tap_num_clips=self.cfg.TAP.NUM_CLIPS,
                 tap_num_frames=self.cfg.TAP.NUM_FRAMES,
             )
@@ -475,7 +477,13 @@ class Tap(torch.utils.data.Dataset):
             if self.cfg.DATA.DUMMY_LOAD:
                 if self.dummy_output is None:
                     self.dummy_output = (frames, label, index, time_idx, {})
-            return frames, label, index, time_idx, {}
+            return (
+                frames,
+                label,
+                index,
+                time_idx,
+                {"video_name": self._path_to_videos[index].split("/")[-1]},
+            )
         else:
             logger.warning(
                 "Failed to fetch video after {} retries.".format(self._num_retries)

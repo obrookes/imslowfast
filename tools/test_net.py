@@ -46,11 +46,10 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     model.eval()
     test_meter.iter_tic()
 
-    # Save feats
-    if cfg.TEST.RETURN_FEATS:
-        all_preds = []
-        all_feats = []
-        all_names = []
+    all_preds = []
+    all_feats = []
+    all_names = []
+    all_cas = []
 
     for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(test_loader):
         if cfg.NUM_GPUS:
@@ -119,15 +118,34 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             preds = torch.sum(probs, 1)
         elif cfg.AUG.MANIFOLD_MIXUP:
             out = model(inputs, labels)
+        elif cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
+            # Perform the forward pass.
+            preds, feats, cas = model(inputs)
+        elif cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
+            # Perform the forward pass.
+            out = model(inputs)
         else:
             # Perform the forward pass.
             out = model(inputs)
-        if cfg.TEST.RETURN_FEATS:
-            preds, feats = out[0], out[1]
 
-            all_preds.append(preds)
+        # all_preds.append(preds)
+        all_names.extend(meta["video_name"])
+
+        # Append outputs following forward pass
+        if cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
             all_feats.append(feats)
-            all_names.extend(meta["video_name"])
+            all_cas.append(cas)
+            all_preds.append(preds)
+
+        # Append outputs following forward pass
+        if cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
+            preds, feats = out[0], out[1]
+            all_feats.append(feats)
+            all_preds.append(preds)
+
+        if cfg.TEST.RETURN_CAS and not cfg.TEST.RETURN_FEATS:
+            all_cas.append(cas)
+            all_preds.append(preds)
 
         # Gather all the predictions across all the devices to perform ensemble.
         if cfg.NUM_GPUS > 1:
@@ -166,8 +184,17 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             logger.info("Successfully saved prediction results to {}".format(save_path))
 
     test_meter.finalize_metrics()
-    if cfg.TEST.RETURN_FEATS:
+    if cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
         return test_meter, all_names, all_preds, torch.cat(all_feats, dim=0), all_labels
+    elif cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
+        return (
+            test_meter,
+            all_names,
+            all_preds,
+            torch.cat(all_cas, dim=0),
+            torch.cat(all_feats, dim=0),
+            all_labels,
+        )
     else:
         return test_meter
 
@@ -257,7 +284,11 @@ def test(cfg):
             writer = None
 
         # # Perform multi-view test on the entire dataset.
-        if cfg.TEST.RETURN_FEATS:
+        if cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
+            test_meter, names, preds, cas, feats, labels = perform_test(
+                test_loader, model, test_meter, cfg, writer
+            )
+        elif cfg.TEST.RETURN_FEATS:
             test_meter, names, preds, feats, labels = perform_test(
                 test_loader, model, test_meter, cfg, writer
             )
@@ -268,10 +299,19 @@ def test(cfg):
             writer.close()
 
     # Dict for storing features and labels
-    feats = {"names": names, "preds": preds, "feats": feats, "labels": labels}
+    if cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
+        feats = {"names": names, "preds": preds, "feats": feats, "labels": labels}
+    if cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
+        feats = {
+            "names": names,
+            "preds": preds,
+            "cas": cas,
+            "feats": feats,
+            "labels": labels,
+        }
 
     # Save the output features
-    if cfg.TEST.RETURN_FEATS:
+    if cfg.TEST.RETURN_FEATS or (cfg.TAP.ENABLE and cfg.TEST.RETURN_CAS):
         save_path = os.path.join(
             cfg.OUTPUT_DIR, f"{cfg.OUTPUT_DIR.split('/')[-1]}_feats.pkl"
         )
