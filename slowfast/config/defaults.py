@@ -848,6 +848,10 @@ _C.DATA.IN_VAL_CROP_RATIO = 0.875  # 224/256 = 0.875
 # don't use real video for kinetics.py
 _C.DATA.DUMMY_LOAD = False
 
+_C.DATA.PSEUDO_LABELS = ""
+
+_C.DATA.PSEUDO_LABELS_WEIGHT = 1.0
+
 # ---------------------------------------------------------------------------- #
 # Optimizer options
 # ---------------------------------------------------------------------------- #
