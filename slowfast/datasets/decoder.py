@@ -13,22 +13,67 @@ from . import transform as transform
 logger = logging.getLogger(__name__)
 
 
-def subsample_clip(video_tensor, N=8):
-    T, C, H, W = video_tensor.shape
-    indices = torch.linspace(0, T - 1, N).long()
-    return video_tensor[indices]
+def video_to_clips(
+    video_tensor, n_clips, n_samples, overlap=0.25, sliding_window=False
+):
+    """
+    Converts a video tensor into a list of clips.
 
+    Args:
+        video_tensor (torch.Tensor): The input video tensor of shape (T, C, H, W), where T is the number of frames,
+                                     C is the number of channels, H is the height, and W is the width.
+        n_clips (int): The desired number of clips to generate.
+        n_samples (int): The number of samples to subsample from each clip.
+        overlap (float, optional): The overlap ratio between adjacent clips. Defaults to 0.25.
+        sliding_window (bool, optional): If True, uses a sliding window approach to generate clips. If False,
+                                         divides the video tensor into equal-sized clips.
 
-def video_to_clips(video_tensor, n_clips, n_samples):
-    T, C, H, W = video_tensor.shape
-    T_per_clip = T // n_clips
+    Returns:
+        list: A list of clips, where each clip is a tensor of shape (T_clip, C, H, W), and T_clip is the number of frames
+              in each clip.
+    """
     clips = []
-    for i in range(n_clips):
-        ss_clip = subsample_clip(
-            video_tensor[i * T_per_clip : (i + 1) * T_per_clip], n_samples
-        )
-        clips.append(ss_clip)
+    T, C, H, W = video_tensor.shape
+    if sliding_window:
+        # Calculate the size of each clip
+        clip_size = math.ceil(T / (n_clips * (1 - overlap) + overlap))
+
+        # Calculate stride based on the overlap
+        stride = math.floor(clip_size * (1 - overlap))
+
+        start = 0
+        while start + clip_size <= T:
+            clip = video_tensor[start : start + clip_size]
+            ss_clip = subsample_clip(clip, n_samples)
+            clips.append(ss_clip)
+            start += stride
+
+        # If we haven't generated enough clips, add the last clip
+        if len(clips) < n_clips:
+            start = T - clip_size
+            clip = video_tensor[start:T]
+            ss_clip = subsample_clip(clip, n_samples)
+            clips.append(ss_clip)
+
+        # If we have generated too many clips, keep the first n_clips
+        clips = clips[:n_clips]
+    else:
+        T_per_clip = T // n_clips
+        for i in range(n_clips):
+            ss_clip = subsample_clip(
+                video_tensor[i * T_per_clip : (i + 1) * T_per_clip], n_samples
+            )
+            clips.append(ss_clip)
     return clips
+
+
+def subsample_clip(clip, n_samples):
+    T, C, H, W = clip.shape
+    if T <= n_samples:
+        return clip
+
+    indices = torch.linspace(0, T - 1, n_samples).long()
+    return clip[indices]
 
 
 def temporal_sampling(frames, start_idx, end_idx, num_samples):
@@ -489,6 +534,8 @@ def decode(
     tap_enabled=False,
     tap_num_clips=None,
     tap_num_frames=None,
+    tap_sliding_window=False,
+    tap_overlap=None,
 ):
     """
     Decode the video and perform temporal sampling.
@@ -600,9 +647,20 @@ def decode(
 
     if tap_enabled:
         frames = frames_decoded[0]
-        video_clips = video_to_clips(
-            frames, n_clips=tap_num_clips, n_samples=tap_num_frames
-        )
+        if tap_sliding_window:
+            video_clips = video_to_clips(
+                frames,
+                n_clips=tap_num_clips,
+                n_samples=tap_num_frames,
+                sliding_window=True,
+                overlap=tap_overlap,
+            )
+        else:
+            video_clips = video_to_clips(
+                frames,
+                n_clips=tap_num_clips,
+                n_samples=tap_num_frames,
+            )
 
         for k in range(num_decode):
             T = num_frames[k]
