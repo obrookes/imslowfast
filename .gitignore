@@ -1,0 +1,10 @@
+dataset/
+slowfast/
+catboost_info/
+weights/
+detectron2_repo/
+.vscode/
+data/
+*.pyc
+*.pkl
+*.png
