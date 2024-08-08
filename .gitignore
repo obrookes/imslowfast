@@ -5,6 +5,16 @@ weights/
 detectron2_repo/
 .vscode/
 data/
-*.pyc
+*__pycache__/
+*.pyth
 *.pkl
+*.log    
+*.csv    
+*.pdf    
+*.png    
+*.jpg    
+*.arrow    
+*.json    
+*.npz
+*.pyc
 *.png
