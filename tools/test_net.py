@@ -3,9 +3,10 @@
 
 """Multi-view test a video classification model."""
 
-import numpy as np
 import os
 import pickle
+
+import numpy as np
 import torch
 
 import slowfast.utils.checkpoint as cu
@@ -126,7 +127,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             out = model(inputs)
         else:
             # Perform the forward pass.
-            out = model(inputs)
+            preds = model(inputs)
 
         # all_preds.append(preds)
         all_names.extend(meta["video_name"])
@@ -220,7 +221,6 @@ def test(cfg):
 
     test_meters = []
     for num_view in cfg.TEST.NUM_TEMPORAL_CLIPS:
-
         cfg.TEST.NUM_ENSEMBLE_VIEWS = num_view
 
         # Print config.
@@ -331,8 +331,7 @@ def test(cfg):
         result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
 
         result_string = (
-            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
-            "".format(
+            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}" "".format(
                 params / 1e6,
                 flops,
                 view,

@@ -3,7 +3,10 @@ slowfast/
 catboost_info/
 weights/
 detectron2_repo/
+model=slow_r50_ds=panaf_seq_with_negatives/
+vision/
 .vscode/
+
 data/
 *.pyc
 *.pkl
