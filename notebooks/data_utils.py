@@ -1,9 +1,10 @@
 import ast
-import torch
+import pickle as pkl
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle as pkl
-import matplotlib.pyplot as plt
+import torch
 from torchmetrics.functional.classification import (
     multilabel_average_precision,
 )

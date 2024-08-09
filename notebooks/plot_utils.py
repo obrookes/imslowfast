@@ -1,15 +1,10 @@
-import ast
-import torch
-import numpy as np
-import seaborn as sns
-import pandas as pd
-import pickle as pkl
 import matplotlib.pyplot as plt
-from torchmetrics.functional.classification import (
-    multilabel_average_precision,
-)
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 plt.style.use("science")
+plt.rcParams.update({"font.family": "Times New Roman"})
 
 
 def plot_camera_locations_distribution(df, head=50, tail=10, use_proportion=False):
@@ -111,61 +106,61 @@ def plot_camera_locations_distribution(df, head=50, tail=10, use_proportion=Fals
 
 
 def plot_heatmap(data, behavioural_dict, title, ax, labels, behaviors=None):
-    cax = ax.imshow(data, cmap="Blues", vmin=0, vmax=1)
-    ax.set_xticks(np.arange(len(labels)))
-    ax.set_xticklabels(
-        labels, fontsize=8, rotation=45, ha="right", rotation_mode="anchor"
+    sns.heatmap(
+        data,
+        ax=ax,
+        cmap="Blues",
+        vmin=0,
+        vmax=1,
+        annot=False,
+        cbar=False,
+        square=True,
+        fmt=".2f",
     )
-    if behaviors is not None:
-        ax.set_yticks(np.arange(len(behaviors)))
-        ax.set_yticklabels(behaviors, fontsize=8)
-    else:
-        ax.set_yticks(np.arange(data.shape[0]))
-        ax.set_yticklabels(labels, fontsize=8)
+
+    ax.set_xticklabels(labels, fontsize=8, rotation=45)
 
     if behaviors is None:
+        ax.set_yticklabels(labels, fontsize=8)
         for i in range(data.shape[0]):
             for j in range(data.shape[1]):
-                ax.text(j, i, f"{data[i, j]:.3f}", ha="center", va="center")
+                text_color = "black"
+                if data[i, j] > 0.5:
+                    text_color = "white"
+                ax.text(
+                    j + 0.5,
+                    i + 0.5,
+                    f"{data[i, j]:.3f}",
+                    ha="center",
+                    va="center",
+                    color=text_color,
+                )
     else:
         for i in range(len(behaviors)):
             for j in range(len(labels)):
+                text_color = "black"
                 if behaviors[i] in behavioural_dict["head"]:
-                    ax.text(
-                        j,
-                        i,
-                        f"{data[i, j]:.2f}",
-                        ha="center",
-                        va="center",
-                        color="lime",
-                    )
+                    text_color = "lime"
                 elif behaviors[i] in behavioural_dict["tail"]:
-                    ax.text(
-                        j,
-                        i,
-                        f"{data[i, j]:.2f}",
-                        ha="center",
-                        va="center",
-                        color="magenta",
-                    )
+                    text_color = "magenta"
                 elif behaviors[i] in behavioural_dict["few_shot"]:
-                    ax.text(
-                        j,
-                        i,
-                        f"{data[i, j]:.2f}",
-                        ha="center",
-                        va="center",
-                        color="olive",
-                    )
-
-    ax.set_xlabel("Camera locations", fontsize=8)
-    ax.set_ylabel("Behaviors", fontsize=8)
-
-    # add legend for behaviors colors below the heatmap
-
-    ax.set_title(title, fontsize=10)
-    if behaviors is not None:
-        # add legend for behaviors colors below the heatmap
+                    text_color = "olive"
+                ax.text(
+                    j + 0.5,
+                    i + 0.5,
+                    f"{data[i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    color=text_color,
+                )
+        ax.set_yticklabels(
+            behaviors,
+            fontsize=8,
+            rotation=0,
+            # va="center",
+            # ha="right",
+            # rotation_mode="anchor",
+        )
         ax.legend(
             [
                 plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="lime"),
@@ -183,8 +178,12 @@ def plot_heatmap(data, behavioural_dict, title, ax, labels, behaviors=None):
             fontsize=8,
         )
 
+    ax.set_xlabel("Camera locations", fontsize=8)
+    ax.set_ylabel("Behaviors", fontsize=8)
+    ax.set_title(title, fontsize=10)
 
-def plot_training_progression(datas, split="train_data"):
+
+def plot_training_progression(datas, split="train_data", dpi=300):
     # Generate doubling epochs
     epochs = [int(x) for x in datas.keys()]
 
@@ -203,7 +202,7 @@ def plot_training_progression(datas, split="train_data"):
     }
 
     # Set up the plot
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 8), dpi=dpi)
     colors = ["red", "green", "blue"]
     line_styles = ["-", "--", ":"]
 
@@ -245,7 +244,7 @@ def plot_training_progression(datas, split="train_data"):
     plt.show()
 
 
-def plot_training_progression_with_variation(datas, split="train_data"):
+def plot_training_progression_with_variation(datas, split="train_data", dpi=300):
     epochs = [int(x) for x in datas.keys()]
     behaviors = ["head", "tail", "few shot"]
     locations = ["head", "tail", "few shot"]
@@ -261,7 +260,7 @@ def plot_training_progression_with_variation(datas, split="train_data"):
         for i, behavior in enumerate(behaviors)
     }
 
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 8), dpi=dpi)
     colors = ["red", "green", "blue"]
 
     for i, behavior in enumerate(behaviors):
@@ -303,12 +302,12 @@ def plot_training_progression_with_variation(datas, split="train_data"):
     plt.show()
 
 
-def plot_map_values(datas):
+def plot_map_values(datas, dpi=300):
     epochs = sorted([int(x) for x in datas.keys()])
     locations = ["train_head_loc", "train_tail_loc", "train_few_shot_loc"]
     colors = ["red", "green", "blue"]
 
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 8), dpi=dpi)
 
     for i, location in enumerate(locations):
         values = [datas[str(epoch)]["map"][location] for epoch in epochs]
@@ -337,7 +336,7 @@ def plot_map_values(datas):
     plt.show()
 
 
-def plot_behavior_distribution(df, behavior_list, annot="percentage"):
+def plot_behavior_distribution(df, behavior_list, annot="percentage", dpi=300):
     # Ensure the number of behaviors matches the length of multihot encodings
     num_behaviors = len(df["label"].iloc[0])
     if len(behavior_list) != num_behaviors:
@@ -365,7 +364,7 @@ def plot_behavior_distribution(df, behavior_list, annot="percentage"):
     plot_df = plot_df.sort_values("Percentage", ascending=False)
 
     # Create the plot
-    plt.figure(figsize=(8, 8))
+    plt.figure(figsize=(8, 8), dpi=dpi)
     sns.set(style="whitegrid")
 
     # Create the bar plot
@@ -390,7 +389,7 @@ def plot_behavior_distribution(df, behavior_list, annot="percentage"):
 
 
 def plot_aggregated_behavior_distribution(
-    df, behavior_list, segment_list, plot_type="bar", segment="all"
+    df, behavior_list, segment_list, plot_type="bar", segment="all", dpi=300
 ):
     # Ensure the lengths match
     if len(behavior_list) != len(segment_list) or len(behavior_list) != len(
@@ -441,7 +440,7 @@ def plot_aggregated_behavior_distribution(
 
     if plot_type == "bar":
         # Create the bar plot
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(12, 6), dpi=dpi)
         ax = sns.barplot(
             x="Segment",
             y="Percentage",
@@ -477,7 +476,7 @@ def plot_aggregated_behavior_distribution(
 
     elif plot_type == "pie":
         # Create the pie chart
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(10, 8), dpi=dpi)
         colors = sns.color_palette("viridis", n_colors=len(all_segments))
         plt.pie(
             merged_df["Percentage"],
@@ -508,7 +507,7 @@ def plot_aggregated_behavior_distribution(
 
 
 def plot_multiple_behavior_distributions(
-    dfs, behavior_list, annot="proportion", titles=None
+    dfs, behavior_list, annot="proportion", titles=None, dpi=300
 ):
     if not isinstance(dfs, list):
         raise ValueError("dfs must be a list of dataframes")
@@ -521,7 +520,9 @@ def plot_multiple_behavior_distributions(
             f"The length of behavior_list ({len(behavior_list)}) does not match the number of behaviors in the data ({num_behaviors})"
         )
 
-    fig, axes = plt.subplots(1, num_dfs, figsize=(8 * num_dfs, 8), squeeze=False)
+    fig, axes = plt.subplots(
+        1, num_dfs, figsize=(8 * num_dfs, 8), squeeze=False, dpi=dpi
+    )
     fig.suptitle("Distribution of Behaviors Across Videos", fontsize=16)
 
     for i, df in enumerate(dfs):
