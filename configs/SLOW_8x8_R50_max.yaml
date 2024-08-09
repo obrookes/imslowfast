@@ -11,7 +11,7 @@ TRAIN:
 TEST:
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 8
+  BATCH_SIZE: 1
   NUM_ENSEMBLE_VIEWS: 1
   NUM_SPATIAL_CROPS: 1
 DATA:
@@ -21,7 +21,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/standard
+  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/gradcam
   PATH_PREFIX: /home/kukushkin/imslowfast/dataset/videos/
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
@@ -89,4 +89,4 @@ NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_with_negatives'
+OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_with_negatives-epoch=200'
