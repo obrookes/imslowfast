@@ -196,7 +196,7 @@ def perform_wrong_prediction_vis(vis_loader, model, cfg):
             slowfast/config/defaults.py
     """
     wrong_prediction_visualizer = WrongPredictionVis(cfg=cfg)
-    for batch_idx, (inputs, labels, _, _) in tqdm.tqdm(enumerate(vis_loader)):
+    for batch_idx, (inputs, labels, _, _, _) in tqdm.tqdm(enumerate(vis_loader)):
         if cfg.NUM_GPUS:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):

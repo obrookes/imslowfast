@@ -1,0 +1,14 @@
+aggression
+bipedal
+camera_reaction
+climbing
+display
+feeding
+grooming
+object_carrying
+piloerection
+playing
+resting
+tool_use
+travel
+vocalisation

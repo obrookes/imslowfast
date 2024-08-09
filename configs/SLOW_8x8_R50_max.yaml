@@ -4,7 +4,7 @@ TRAIN:
   BATCH_SIZE: 16
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 100
-  CHECKPOINT_FILE_PATH: weights/model=slow-r50_w-negatives_epoch=200.pyth
+  CHECKPOINT_FILE_PATH: weights/model=slow-r50_w-negatives_epoch=005.pyth
   CHECKPOINT_TYPE: pytorch
   MIXED_PRECISION: True
   AUTO_RESUME: False
@@ -21,7 +21,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/gradcam
+  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/gradcam
   PATH_PREFIX: /home/kukushkin/imslowfast/dataset/videos/
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
@@ -39,6 +39,9 @@ TENSORBOARD:
     ENABLE: True
     TOPK: 3
     SUBSET_PATH: /home/kukushkin/imslowfast/dataset/metadata/behaviours.txt
+  WRONG_PRED_VIS: 
+    ENABLE:   False
+    #SUBSET_PATH: /home/kukushkin/imslowfast/dataset/gradcam
   MODEL_VIS:
     ENABLE: True
     MODEL_WEIGHTS: True
@@ -89,4 +92,4 @@ NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_with_negatives-epoch=200'
+OUTPUT_DIR: 'model=slow_r50_ds=panaf_seq_with_negatives-epoch=005'
