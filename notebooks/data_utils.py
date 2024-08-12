@@ -112,11 +112,38 @@ def return_ct_location_segments(df, head=50, tail=10):
     )
 
 
-def print_per_segement_performance(
+def print_per_segment_performance_old(
     map, behaviour_list, segment_list, segment, show_per_class=True
 ):
     res = []
     for i, (b, s) in enumerate(zip(map, segment_list)):
+        if s == segment:
+            res.append({behaviour_list[i]: b})
+    agg_values = []
+    for r in res:
+        for _, value in r.items():
+            agg_values.append(value)
+
+    if show_per_class:
+        return {
+            segment: {
+                "mean": np.round(np.mean(agg_values), 3),
+                "values": res,
+            }
+        }
+    else:
+        return {
+            segment: {
+                "mean": np.round(np.mean(agg_values), 3),
+            }
+        }
+
+
+def print_per_segment_performance(
+    map, behaviour_list, camera_list, segment, show_per_class=True
+):
+    res = []
+    for i, (b, s) in enumerate(zip(map, camera_list)):
         if s == segment:
             res.append({behaviour_list[i]: b})
     agg_values = []
@@ -150,15 +177,15 @@ def calculate_metrics(
     )
 
     # replace -0.0 with 0.0
-    map[map == -0.0] = 0.0
+    # map[map == -0.0] = 0.0
 
-    map_head = print_per_segement_performance(
+    map_head = print_per_segment_performance(
         map, behaviour_list, segment_list, "head", show_per_class
     )
-    map_tail = print_per_segement_performance(
+    map_tail = print_per_segment_performance(
         map, behaviour_list, segment_list, "tail", show_per_class
     )
-    map_fs = print_per_segement_performance(
+    map_fs = print_per_segment_performance(
         map, behaviour_list, segment_list, "few_shot", show_per_class
     )
 
