@@ -243,3 +243,46 @@ def calculate_all_metrics(segments, behaviour_list, segment_list, show_per_class
             show_per_class=show_per_class,
         )
     return metrics
+
+
+def return_sorted_heatmap(df, normalize=False):
+    # Stack predictions
+    df["pred"] = df["pred"].apply(lambda x: np.array(x))
+
+    # Stack labels (assuming they're already multi-hot encoded)
+    df["label"] = df["label"].apply(lambda x: np.array(x))
+
+    # Group by UTM and sum labels
+    utm_label_sums = df.groupby("utm").apply(
+        lambda x: np.sum(np.vstack(x["label"].values), axis=0)
+    )
+
+    # Count videos per UTM location
+    video_counts = df["utm"].value_counts()
+
+    # Create a union of all UTM locations
+    all_utms = sorted(set(utm_label_sums.index) | set(video_counts.index))
+
+    # Reindex both DataFrames to include all UTM locations
+    utm_label_sums = utm_label_sums.reindex(all_utms, fill_value=0)
+    video_counts = video_counts.reindex(all_utms, fill_value=0)
+
+    # Normalize label sums by video counts
+    if normalize:
+        normalized_data = utm_label_sums.div(video_counts, axis=0).fillna(0)
+    else:
+        normalized_data = utm_label_sums
+
+    # Convert to DataFrame for easier plotting
+    heatmap_data = pd.DataFrame(
+        normalized_data.values.tolist(), index=normalized_data.index
+    )
+
+    # Sort heatmap_data by video counts (descending order)
+    heatmap_data = heatmap_data.loc[video_counts.sort_values(ascending=False).index]
+
+    # Set index name to utm
+    heatmap_data.index.name = "utm"
+    heatmap_data.reset_index(inplace=True)
+
+    return heatmap_data
