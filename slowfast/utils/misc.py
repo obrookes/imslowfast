@@ -145,9 +145,16 @@ def _get_model_analysis_input(cfg, use_train_input):
         if cfg.NUM_GPUS:
             bbox = bbox.cuda()
         inputs = (model_inputs, bbox)
-    if cfg.AUG.MANIFOLD_MIXUP:
+    elif cfg.AUG.MANIFOLD_MIXUP:
         labels = torch.rand(1, cfg.MODEL.NUM_CLASSES)
         inputs = (model_inputs, labels)
+    elif cfg.TRAIN.DATASET == "nkinetics":
+        inputs = {
+            "fg_frames": model_inputs,
+            "bg_frames": model_inputs,
+            "mask": torch.ones(1),
+            "utm": torch.ones(1),
+        }
     else:
         inputs = (model_inputs,)
     return inputs
