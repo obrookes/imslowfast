@@ -134,6 +134,20 @@ def train_epoch(
                             inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
                     else:
                         inputs[i] = inputs[i].cuda(non_blocking=True)
+            elif isinstance(inputs, (dict,)):
+                for key, val in inputs.items():
+                    if isinstance(val, (list,)):
+                        for i in range(len(val)):
+                            if isinstance(val[i], (list,)):
+                                for j in range(len(val[i])):
+                                    val[i][j] = val[i][j].cuda(non_blocking=True)
+                            else:
+                                try:
+                                    val[i] = val[i].cuda(non_blocking=True)
+                                except:
+                                    continue
+                    else:
+                        inputs[key] = val.cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
             if not isinstance(labels, list):
@@ -150,9 +164,18 @@ def train_epoch(
                 else:
                     meta[key] = val.cuda(non_blocking=True)
 
-        batch_size = (
-            inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
-        )
+        try:
+            batch_size = (
+                inputs[0][0].size(0)
+                if isinstance(inputs[0], list)
+                else inputs[0].size(0)
+            )
+        except:
+            batch_size = (
+                inputs["fg_frames"][0].size(0)
+                if isinstance(inputs, dict)
+                else inputs["fg_frames"].size(0)
+            )
         # Update the learning rate.
         epoch_exact = cur_epoch + float(cur_iter) / data_size
         lr = optim.get_epoch_lr(epoch_exact, cfg)
@@ -411,6 +434,13 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
                     inputs[i] = inputs[i].cuda(non_blocking=True)
+            elif isinstance(inputs, (dict,)):
+                for key, val in inputs.items():
+                    if isinstance(val, (list,)):
+                        for i in range(len(val)):
+                            val[i] = val[i].cuda(non_blocking=True)
+                    else:
+                        inputs[key] = val.cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
             labels = labels.cuda()
@@ -425,9 +455,18 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                     meta[key] = val.cuda(non_blocking=True)
             index = index.cuda()
             time = time.cuda()
-        batch_size = (
-            inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
-        )
+        try:
+            batch_size = (
+                inputs[0][0].size(0)
+                if isinstance(inputs[0], list)
+                else inputs[0].size(0)
+            )
+        except:
+            batch_size = (
+                inputs["fg_frames"][0].size(0)
+                if isinstance(inputs, dict)
+                else inputs["fg_frames"].size(0)
+            )
         val_meter.data_toc()
 
         if cfg.DETECTION.ENABLE:
