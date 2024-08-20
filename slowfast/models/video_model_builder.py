@@ -1465,7 +1465,6 @@ class ResNetFGBGMixup(nn.Module):
         mask = torch.tensor(mask, dtype=torch.bool)
         if self.training:
             # Mix embeddings based on the given criteria
-            print(f"Mixing embeddings based on the given criteria")
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"],
                 emb_dict["bg_frames"],
