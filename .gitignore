@@ -4,7 +4,6 @@ dataset/gradcam/videos/
 dataset/annotations/
 dataset/metadata/metadata.csv
 dataset/metadata/metadata_with_desc.csv
-slowfast/
 catboost_info/
 weights/
 
