@@ -93,7 +93,7 @@ _C.CONTRASTIVE.KNN_ON = True
 
 _C.TAP = CfgNode()
 
-_C.TAP.ENABLE = True
+_C.TAP.ENABLE = False
 
 _C.TAP.NUM_CLIPS = 4
 
@@ -851,6 +851,16 @@ _C.DATA.DUMMY_LOAD = False
 _C.DATA.PSEUDO_LABELS = ""
 
 _C.DATA.PSEUDO_LABELS_WEIGHT = 1.0
+
+# ---------------------------------------------------------------------------- #
+# FG-BG Mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FG_BG_MIXUP = CfgNode()
+
+_C.FG_BG_MIXUP.ENABLE = False
+
+_C.FG_BG_MIXUP.GLOBAL_BG = False
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options
