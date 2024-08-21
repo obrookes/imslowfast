@@ -1442,31 +1442,7 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward_bg(self, x):
-        emb_dict = {}
-        utm = x["utm"]
-        for k, v in x.items():
-            if (k != "mask") and (k != "utm") and (k != "fg_frames"):
-                with torch.no_grad():
-                    x = v[:]  # avoid pass by reference
-                    x = self.s1(x)
-                    x = self.s2(x)
-                    y = []  # Don't modify x list in place due to activation checkpoint.
-                    for pathway in range(self.num_pathways):
-                        pool = getattr(self, "pathway{}_pool".format(pathway))
-                        y.append(pool(x[pathway]))
-                    x = self.s3(y)
-                    x = self.s4(x)
-                    x = self.s5(x)
-                    x = torch.cat(x, 1)
-                    x = self.avg_pool(x)
-                    x = torch.flatten(x, 1)
-
-                    emb_dict[k] = x
-
-        return emb_dict["bg_frames"], utm
-
-    def forward(self, x, global_bg_embs=None):
+    def forward(self, x, global_bg_embs=None, return_bg_embs=False):
         emb_dict = {}
         mask = x["mask"]
         utm = x["utm"]
@@ -1491,7 +1467,7 @@ class ResNetFGBGMixup(nn.Module):
         # Create a tensor of boolean values for negative foregrounds
         mask = torch.tensor(mask, dtype=torch.bool)
 
-        if self.training:
+        if (self.training) and (not return_bg_embs):
             if global_bg_embs is not None:
                 # Mix embeddings based on global fg embs
                 embs = self.mix_fg_bg(
@@ -1511,6 +1487,10 @@ class ResNetFGBGMixup(nn.Module):
                     mask,
                     utm,
                 )
+        elif return_bg_embs:
+            # Return background embeddings
+            embs = emb_dict["bg_frames"]
+            return embs, utm
         else:
             embs = emb_dict["fg_frames"]
 

@@ -122,7 +122,7 @@ def calculate_embeddings(cfg, model, train_loader, reduction="average"):
                     meta[key] = val.cuda(non_blocking=True)
 
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
-            embeddings, utm = model.forward_bg(inputs)
+            embeddings, utm = model(inputs, return_bg_embs=True)
             embs.append(embeddings)
             utms.append(utm)
 
