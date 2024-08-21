@@ -93,7 +93,7 @@ _C.CONTRASTIVE.KNN_ON = True
 
 _C.TAP = CfgNode()
 
-_C.TAP.ENABLE = True
+_C.TAP.ENABLE = False
 
 _C.TAP.NUM_CLIPS = 4
 
