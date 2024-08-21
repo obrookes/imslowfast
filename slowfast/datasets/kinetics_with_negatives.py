@@ -491,13 +491,13 @@ class Nkinetics(torch.utils.data.Dataset):
                         bg_out[idx] = bg_out[idx].permute(0, 2, 3, 1)
 
                     # Perform color normalization.
-                    # fg_out[idx] = utils.tensor_normalize(
-                    #     fg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    # )
+                    fg_out[idx] = utils.tensor_normalize(
+                        fg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
+                    )
 
-                    # bg_out[idx] = utils.tensor_normalize(
-                    #     bg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    # )
+                    bg_out[idx] = utils.tensor_normalize(
+                        bg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
+                    )
 
                     # T H W C -> C T H W.
                     fg_out[idx] = fg_out[idx].permute(3, 0, 1, 2)
