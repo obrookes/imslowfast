@@ -862,6 +862,10 @@ _C.FG_BG_MIXUP.ENABLE = False
 
 _C.FG_BG_MIXUP.GLOBAL_BG = False
 
+_C.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG = False
+
+_C.FG_BG_MIXUP.ADD_GLOBAL_BG = False
+
 # ---------------------------------------------------------------------------- #
 # Optimizer options
 # ---------------------------------------------------------------------------- #

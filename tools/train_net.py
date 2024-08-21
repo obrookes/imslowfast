@@ -121,19 +121,6 @@ def calculate_embeddings(cfg, model, train_loader, reduction="average"):
                 else:
                     meta[key] = val.cuda(non_blocking=True)
 
-        try:
-            batch_size = (
-                inputs[0][0].size(0)
-                if isinstance(inputs[0], list)
-                else inputs[0].size(0)
-            )
-        except:
-            batch_size = (
-                inputs["fg_frames"][0].size(0)
-                if isinstance(inputs, dict)
-                else inputs["fg_frames"].size(0)
-            )
-
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
             embeddings, utm = model.forward_bg(inputs)
             embs.append(embeddings)

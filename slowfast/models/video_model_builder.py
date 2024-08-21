@@ -1261,6 +1261,8 @@ class ResNetFGBGMixup(nn.Module):
         self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
+        self.subtract_global = cfg.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG
+        self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1498,8 +1500,8 @@ class ResNetFGBGMixup(nn.Module):
                     mask,
                     utm,
                     global_bg_embs,
-                    subtract_global=False,
-                    add_global=True,
+                    subtract_global=self.subtract_global,
+                    add_global=self.add_global,
                 )
             else:
                 # Mix embeddings based on the batch
