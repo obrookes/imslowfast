@@ -79,6 +79,89 @@ def calculate_loss_with_pseudo_labels(preds, labels, loss_func, store_dict):
     return total_loss
 
 
+def calculate_embeddings(cfg, model, train_loader, reduction="average"):
+    embs, utms = [], []
+    for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
+        # Transfer the data to the current GPU device.
+        if cfg.NUM_GPUS:
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    if isinstance(inputs[i], (list,)):
+                        for j in range(len(inputs[i])):
+                            inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
+                    else:
+                        inputs[i] = inputs[i].cuda(non_blocking=True)
+            elif isinstance(inputs, (dict,)):
+                for key, val in inputs.items():
+                    if isinstance(val, (list,)):
+                        for i in range(len(val)):
+                            if isinstance(val[i], (list,)):
+                                for j in range(len(val[i])):
+                                    val[i][j] = val[i][j].cuda(non_blocking=True)
+                            else:
+                                try:
+                                    val[i] = val[i].cuda(non_blocking=True)
+                                except:
+                                    continue
+                    else:
+                        inputs[key] = val.cuda(non_blocking=True)
+            else:
+                inputs = inputs.cuda(non_blocking=True)
+            if not isinstance(labels, list):
+                labels = labels.cuda(non_blocking=True)
+                index = index.cuda(non_blocking=True)
+                time = time.cuda(non_blocking=True)
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        if not isinstance(val[i], str):
+                            val[i] = val[i].cuda(non_blocking=True)
+                        else:
+                            continue
+                else:
+                    meta[key] = val.cuda(non_blocking=True)
+
+        try:
+            batch_size = (
+                inputs[0][0].size(0)
+                if isinstance(inputs[0], list)
+                else inputs[0].size(0)
+            )
+        except:
+            batch_size = (
+                inputs["fg_frames"][0].size(0)
+                if isinstance(inputs, dict)
+                else inputs["fg_frames"].size(0)
+            )
+
+        with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
+            embeddings, utm = model.forward_bg(inputs)
+            embs.append(embeddings)
+            utms.append(utm)
+
+    # Concatenate embeddings and utms
+    embs = torch.cat(embs, dim=0)  # [N, 2048]
+    utms = torch.cat(utms, dim=0)  # [N]
+
+    # Make a dictionary of utm as key
+    emb_dict = {}
+    for utm in torch.unique(utms):
+        # If reduction is average, store the average of embeddings
+        if reduction == "average":
+            emb_dict[utm.item()] = torch.mean(embs[utms == utm], dim=0)
+        # Store each embedding separately
+        else:
+            # If not already a key, create a new key
+            if utm.item() not in emb_dict:
+                emb_dict[utm.item()] = []
+                # Add the embedding to the list
+                emb_dict[utm.item()].append(embs[utms == utm])
+            else:
+                # Add the embedding to the list
+                emb_dict[utm.item()].append(embs[utms == utm])
+    return emb_dict
+
+
 def train_epoch(
     train_loader,
     model,
@@ -121,8 +204,16 @@ def train_epoch(
 
     if cfg.MODEL.FROZEN_BN:
         misc.frozen_bn_stats(model)
+
     # Explicitly declare reduction to mean.
     loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+
+    if cfg.FG_BG_MIXUP.ENABLE and cfg.FG_BG_MIXUP.GLOBAL_BG:
+        # Iterate through all bg samples and gather embeddings
+        # Should return a dict with content {'utm_0' : [2048], 'utm_1': [2048]...}
+        bg_embeddings = calculate_embeddings(
+            cfg, model, train_loader, reduction="average"
+        )
 
     for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
@@ -216,6 +307,8 @@ def train_epoch(
                     raise NotImplementedError(
                         "Manifold Mixup requires pairs or triplets"
                     )
+            elif cfg.FG_BG_MIXUP.ENABLE and cfg.FG_BG_MIXUP.GLOBAL_BG:
+                preds = model(inputs, global_bg_embs=bg_embeddings)
             else:
                 preds = model(inputs)
 
