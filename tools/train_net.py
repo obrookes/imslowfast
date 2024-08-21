@@ -122,10 +122,9 @@ def calculate_embeddings(cfg, model, train_loader, reduction="average"):
                     meta[key] = val.cuda(non_blocking=True)
 
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
-            with torch.no_grad():
-                embeddings, utm = model(inputs, return_bg_embs=True)
-                embs.append(embeddings)
-                utms.append(utm)
+            embeddings, utm = model(inputs, return_bg_embs=True)
+            embs.append(embeddings)
+            utms.append(utm)
 
     # Concatenate embeddings and utms
     embs = torch.cat(embs, dim=0)  # [N, 2048]
@@ -199,9 +198,10 @@ def train_epoch(
     if cfg.FG_BG_MIXUP.ENABLE and cfg.FG_BG_MIXUP.GLOBAL_BG:
         # Iterate through all bg samples and gather embeddings
         # Should return a dict with content {'utm_0' : [2048], 'utm_1': [2048]...}
-        bg_embeddings = calculate_embeddings(
-            cfg, model, train_loader, reduction="average"
-        )
+        with torch.no_grad():
+            bg_embeddings = calculate_embeddings(
+                cfg, model, train_loader, reduction="average"
+            )
 
     for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
