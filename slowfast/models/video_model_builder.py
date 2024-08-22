@@ -2,9 +2,11 @@
 
 
 """Video models."""
+
 import json
 import math
 from functools import partial
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -1470,10 +1472,19 @@ class ResNetFGBGMixup(nn.Module):
                     emb_dict[k] = x
 
         # Create a tensor of boolean values for negative foregrounds
-        mask = torch.tensor(mask, dtype=torch.bool)
+        # mask = torch.tensor(mask, dtype=torch.bool)
+        mask = mask.clone().detach().bool()
 
         if (self.training) and (not return_bg_embs):
             if global_bg_embs is not None:
+                # create fake embs
+                # emb_list = []
+                # for i, (k, v) in enumerate(global_bg_embs.items()):
+                #    emb_list.append(v)
+                #    if i == 3:
+                #        break
+                # embs = emb_dict["fg_frames"] - torch.stack(emb_list)
+
                 # Mix embeddings based on global fg embs
                 embs = self.mix_fg_bg(
                     emb_dict["fg_frames"],
@@ -1910,7 +1921,6 @@ class MViT(nn.Module):
         input_size = self.patch_dims
 
         if self.enable_rev:
-
             # rev does not allow cls token
             assert not self.cls_embed_on
 
@@ -1926,7 +1936,6 @@ class MViT(nn.Module):
                 self.norm = norm_layer(embed_dim)
 
         else:
-
             self.blocks = nn.ModuleList()
 
             for i in range(depth):
@@ -2065,7 +2074,6 @@ class MViT(nn.Module):
         return names
 
     def _get_pos_embed(self, pos_embed, bcthw):
-
         if len(bcthw) == 4:
             t, h, w = 1, bcthw[-2], bcthw[-1]
         else:
