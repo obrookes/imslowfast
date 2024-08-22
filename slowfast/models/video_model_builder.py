@@ -1508,13 +1508,14 @@ class ResNetFGBGMixup(nn.Module):
         # Create a boolean mask for positive foregrounds
         positive_mask = ~mask
 
-        # Subtract background from foreground for positive samples
-        background_subtracted = fg_embs[positive_mask] - bg_embs[positive_mask]
+        positive_indices = torch.where(positive_mask)[0]
 
-        # Add background to subtracted embeddings
-        processed_embeddings = (
-            background_subtracted[positive_mask] + bg2_embs[positive_mask]
-        )
+        for i in positive_indices:
+            # Subtract background from foreground for positive samples
+            background_subtracted = fg_embs[i] - bg_embs[i]
+
+            # Add background to subtracted embeddings
+            processed_embeddings[i] = background_subtracted + bg2_embs[i]
 
         return processed_embeddings
 
