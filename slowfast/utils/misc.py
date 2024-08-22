@@ -152,6 +152,7 @@ def _get_model_analysis_input(cfg, use_train_input):
         inputs = {
             "fg_frames": model_inputs,
             "bg_frames": model_inputs,
+            "bg2_frames": model_inputs,
             "mask": torch.ones(1),
             "utm": torch.ones(1),
         }

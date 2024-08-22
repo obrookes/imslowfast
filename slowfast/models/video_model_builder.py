@@ -1444,87 +1444,50 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x, global_bg_embs=None, return_bg_embs=False):
-        emb_dict = {}
+    def forward(self, x):
+        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
-        utm = x["utm"]
-        if return_bg_embs:
-            for k, v in x.items():
-                if (k != "mask") and (k != "utm") and (k != "fg_frames"):
-                    x = v[:]
-                    x = self.s1(x)
-                    x = self.s2(x)
-                    y = []  # Don't modify x list in place due to activation checkpoint.
-                    for pathway in range(self.num_pathways):
-                        pool = getattr(self, "pathway{}_pool".format(pathway))
-                        y.append(pool(x[pathway]))
-                    x = self.s3(y)
-                    x = self.s4(x)
-                    x = self.s5(x)
-                    x = torch.cat(x, 1)
-                    x = self.avg_pool(x)
-                    x = torch.flatten(x, 1)
+        for k, v in x.items():
+            if (k != "mask") and (k != "utm"):
+                x = v[:]  # avoid pass by reference
+                x = self.s1(x)
+                x = self.s2(x)
+                y = []  # Don't modify x list in place due to activation checkpoint.
+                for pathway in range(self.num_pathways):
+                    pool = getattr(self, "pathway{}_pool".format(pathway))
+                    y.append(pool(x[pathway]))
+                x = self.s3(y)
+                x = self.s4(x)
+                x = self.s5(x)
+                x = torch.cat(x, 1)
+                x = self.avg_pool(x)
+                x = torch.flatten(x, 1)
 
-                    emb_dict[k] = x
+                emb_dict[k] = x
 
-            embs = emb_dict["bg_frames"]
-            return embs, utm
+        mask = mask.clone().detach().bool()
+
+        if self.training:
+            # Mix embeddings based on the batch
+            embs = self.mix_fg_bg(
+                emb_dict["fg_frames"],
+                emb_dict["bg_frames"],
+                emb_dict["bg2_frames"],
+                mask,
+            )
         else:
-            for k, v in x.items():
-                if (k != "mask") and (k != "utm"):
-                    x = v[:]  # avoid pass by reference
-                    x = self.s1(x)
-                    x = self.s2(x)
-                    y = []  # Don't modify x list in place due to activation checkpoint.
-                    for pathway in range(self.num_pathways):
-                        pool = getattr(self, "pathway{}_pool".format(pathway))
-                        y.append(pool(x[pathway]))
-                    x = self.s3(y)
-                    x = self.s4(x)
-                    x = self.s5(x)
-                    x = torch.cat(x, 1)
-                    x = self.avg_pool(x)
-                    x = torch.flatten(x, 1)
+            embs = emb_dict["fg_frames"]
 
-                    emb_dict[k] = x
-
-            mask = mask.clone().detach().bool()
-
-            if self.training:
-                if global_bg_embs is not None:
-                    embs = self.mix_fg_bg(
-                        emb_dict["fg_frames"],
-                        emb_dict["bg_frames"],
-                        mask,
-                        utm,
-                        global_bg_embs,
-                        subtract_global=self.subtract_global,
-                        add_global=self.add_global,
-                    )
-                else:
-                    # Mix embeddings based on the batch
-                    embs = self.mix_fg_bg(
-                        emb_dict["fg_frames"],
-                        emb_dict["bg_frames"],
-                        mask,
-                        utm,
-                    )
-            else:
-                embs = emb_dict["fg_frames"]
-
-            # Project to N dim
-            x = self.projection(embs)
-            return x
+        # Project to N dim
+        x = self.projection(embs)
+        return x
 
     def mix_fg_bg(
         self,
         fg_embs,
         bg_embs,
+        bg2_embs,
         mask,
-        utm,
-        global_bg_embs=None,
-        subtract_global=False,
-        add_global=False,
     ):
         """
         Process video embeddings based on the given criteria and UTM locations using PyTorch.
@@ -1532,17 +1495,11 @@ class ResNetFGBGMixup(nn.Module):
         Args:
         foreground_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
         background_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-
-        labels: torch.Tensor of shape (batch_size, num_classes)
+        background2_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
         mask: torch.Tensor of shape (batch_size,), True for negative foregrounds
-        utm: torch.Tensor of shape (batch_size,) or (batch_size, utm_dim)
-        global_bg_embeddings: Dict of shape (umt, {embedding_dim} )
-        subtract_global: bool, whether to subtract global background embeddings from fg - bg for positive samples
-        add_global: bool, whether to add global background embeddings to subtracted embeddings
 
         Returns:
         processed_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-        processed_labels: torch.Tensor of shape (batch_size, num_classes)
         """
 
         # Create copies to avoid modifying the original tensors
@@ -1551,71 +1508,13 @@ class ResNetFGBGMixup(nn.Module):
         # Create a boolean mask for positive foregrounds
         positive_mask = ~mask
 
-        # For each positive sample, find a background from a different UTM
-        positive_indices = torch.where(positive_mask)[0]
-
-        if subtract_global:
-            batch_utm = utm.tolist()
-            global_bg_utms = global_bg_embs.keys()
-
-            # find intersection of global_bg_utms and batch_utm
-            valid_utms = []
-            for utm in batch_utm:
-                if utm in global_bg_utms:
-                    valid_utms.append(utm)
-
-            # select subset of global_bg_embs with valid_utms
-            bg_embs = torch.stack([global_bg_embs[utm] for utm in valid_utms])
-
         # Subtract background from foreground for positive samples
         background_subtracted = fg_embs[positive_mask] - bg_embs[positive_mask]
 
-        if global_bg_embs is not None:
-            global_bg_embs_keys = list(global_bg_embs.keys())
-
-        for i in positive_indices:
-            if add_global is False:
-                # Find indices of samples with different UTM
-                if utm.dim() > 1:
-                    different_utm = torch.where((utm != utm[i]).any(dim=1))[0]
-                else:
-                    different_utm = torch.where(utm != utm[i])[0]
-
-                # Exclude negative samples from potential backgrounds
-                valid_backgrounds = torch.tensor(
-                    list(
-                        set(different_utm.tolist())
-                        & set(torch.where(~mask)[0].tolist())
-                    )
-                )
-
-                if len(valid_backgrounds) > 0:
-                    # Randomly select one of the valid backgrounds
-                    selected_bg_index = valid_backgrounds[
-                        torch.randint(len(valid_backgrounds), (1,))
-                    ].item()
-
-                    # Add the background-subtracted embedding to the selected background
-                    processed_embeddings[i] = (
-                        background_subtracted[torch.where(positive_mask)[0] == i]
-                        + bg_embs[selected_bg_index]
-                    )
-                else:
-                    # If no valid background found, keep the background-subtracted embedding
-                    processed_embeddings[i] = background_subtracted[
-                        torch.where(positive_mask)[0] == i
-                    ]
-            else:
-                # select random index from global_bg_embs
-                selected_bg_index = global_bg_embs_keys[
-                    torch.randint(len(global_bg_embs_keys), (1,))
-                ]
-
-                # Add the background-subtracted embedding to the selected background
-                processed_embeddings[i] = (
-                    background_subtracted[torch.where(positive_mask)[0] == i]
-                    + global_bg_embs[selected_bg_index]
-                )
+        # Add background to subtracted embeddings
+        processed_embeddings = (
+            background_subtracted[positive_mask] + bg2_embs[positive_mask]
+        )
 
         return processed_embeddings
 
