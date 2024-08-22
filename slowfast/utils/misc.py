@@ -4,10 +4,9 @@
 import json
 import logging
 import math
+import numpy as np
 import os
 from datetime import datetime
-
-import numpy as np
 import psutil
 import torch
 import torchvision.io as io
@@ -16,8 +15,9 @@ from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
 from torch import nn
 from torchvision.utils import make_grid
-
+import torch.distributed as dist
 import slowfast.utils.logging as logging
+import slowfast.utils.multiprocessing as mpu
 from slowfast.datasets.utils import pack_pathway_output
 from slowfast.models.batchnorm_helper import SubBatchNorm3d
 from slowfast.utils.env import pathmgr
