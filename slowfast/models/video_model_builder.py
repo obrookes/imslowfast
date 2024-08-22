@@ -1563,7 +1563,8 @@ class ResNetFGBGMixup(nn.Module):
         # Subtract background from foreground for positive samples
         background_subtracted = fg_embs[positive_mask] - bg_embs[positive_mask]
 
-        global_bg_embs_keys = list(global_bg_embs.keys())
+        if global_bg_embs is not None:
+            global_bg_embs_keys = list(global_bg_embs.keys())
 
         for i in positive_indices:
             if add_global is False:
