@@ -129,7 +129,7 @@ def calculate_embeddings(cfg, model, train_loader, reduction="average"):
 
         assert len(embs) == len(utms)
 
-        if len(embs) > 250:
+        if len(embs) > 100:
             break
 
     # Concatenate embeddings and utms
