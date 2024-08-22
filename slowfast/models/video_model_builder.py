@@ -1602,67 +1602,6 @@ class ResNetFGBGMixup(nn.Module):
         return processed_embeddings
 
 
-# def mix_fg_bg(self, fg_embs, bg_embs, mask, utm):
-#     """
-#     Process video embeddings based on the given criteria and UTM locations using PyTorch.
-
-#     Args:
-#     foreground_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-#     background_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-#     labels: torch.Tensor of shape (batch_size, num_classes)
-#     mask: torch.Tensor of shape (batch_size,), True for negative foregrounds
-#     utm: torch.Tensor of shape (batch_size,) or (batch_size, utm_dim)
-
-#     Returns:
-#     processed_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-#     processed_labels: torch.Tensor of shape (batch_size, num_classes)
-#     """
-
-#     # Create copies to avoid modifying the original tensors
-#     processed_embeddings = fg_embs.clone()
-
-#     # Create a boolean mask for positive foregrounds
-#     positive_mask = ~mask
-
-#     # Subtract background from foreground for positive samples
-#     background_subtracted = (
-#         fg_embs[positive_mask] - bg_embs[positive_mask]
-#     )  # [B, 2048]
-
-#     # For each positive sample, find a background from a different UTM
-#     positive_indices = torch.where(positive_mask)[0]
-#     for i in positive_indices:
-#         # Find indices of samples with different UTM
-#         if utm.dim() > 1:
-#             different_utm = torch.where((utm != utm[i]).any(dim=1))[0]
-#         else:
-#             different_utm = torch.where(utm != utm[i])[0]
-
-#         # Exclude negative samples from potential backgrounds
-#         valid_backgrounds = torch.tensor(
-#             list(set(different_utm.tolist()) & set(torch.where(~mask)[0].tolist()))
-#         )
-
-#         if len(valid_backgrounds) > 0:
-#             # Randomly select one of the valid backgrounds
-#             selected_bg_index = valid_backgrounds[
-#                 torch.randint(len(valid_backgrounds), (1,))
-#             ].item()
-
-#             # Add the background-subtracted embedding to the selected background
-#             processed_embeddings[i] = (
-#                 background_subtracted[torch.where(positive_mask)[0] == i]
-#                 + bg_embs[selected_bg_index]
-#             )
-#         else:
-#             # If no valid background found, keep the background-subtracted embedding
-#             processed_embeddings[i] = background_subtracted[
-#                 torch.where(positive_mask)[0] == i
-#             ]
-
-#     return processed_embeddings
-
-
 @MODEL_REGISTRY.register()
 class X3D(nn.Module):
     """

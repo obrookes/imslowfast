@@ -195,15 +195,14 @@ def train_epoch(
     # Explicitly declare reduction to mean.
     loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
 
-    if cfg.FG_BG_MIXUP.ENABLE and cfg.FG_BG_MIXUP.GLOBAL_BG:
-        # Iterate through all bg samples and gather embeddings
-        # Should return a dict with content {'utm_0' : [2048], 'utm_1': [2048]...}
-        with torch.no_grad():
+    for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
+        if cfg.FG_BG_MIXUP.ENABLE and cfg.FG_BG_MIXUP.GLOBAL_BG:
+            # Iterate through all bg samples and gather embeddings
+            # Should return a dict with content {'utm_0' : [2048], 'utm_1': [2048]...}
             bg_embeddings = calculate_embeddings(
                 cfg, model, train_loader, reduction="average"
             )
 
-    for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             if isinstance(inputs, (list,)):
