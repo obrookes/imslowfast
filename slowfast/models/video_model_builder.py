@@ -1445,10 +1445,6 @@ class ResNetFGBGMixup(nn.Module):
         self.projection = self.head.projection
 
     def forward(self, x, global_bg_embs=None, return_bg_embs=False):
-
-        # [b, 3, 16, 224, 224] -> [b, 3, 1, 224, 224]
-        x["bg_frames"][0] = x["bg_frames"][0][:, :, 7:8, :, :]
-
         emb_dict = {}
         mask = x["mask"]
         utm = x["utm"]

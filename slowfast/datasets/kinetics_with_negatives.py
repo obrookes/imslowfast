@@ -594,6 +594,10 @@ class Nkinetics(torch.utils.data.Dataset):
                         {},
                         {},
                     )
+            # Reduce temporal dimension of bg to 1
+            print(bg_frames[0].shape)
+            bg_frames[0] = bg_frames[0][:, 7:8, :, :]
+
             inputs = {
                 "fg_frames": fg_frames,
                 "bg_frames": bg_frames,
