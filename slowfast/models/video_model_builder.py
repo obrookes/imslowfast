@@ -1448,66 +1448,79 @@ class ResNetFGBGMixup(nn.Module):
         emb_dict = {}
         mask = x["mask"]
         utm = x["utm"]
-        for k, v in x.items():
-            if (k != "mask") and (k != "utm"):
-                x = v[:]  # avoid pass by reference
-                x = self.s1(x)
-                x = self.s2(x)
-                y = []  # Don't modify x list in place due to activation checkpoint.
-                for pathway in range(self.num_pathways):
-                    pool = getattr(self, "pathway{}_pool".format(pathway))
-                    y.append(pool(x[pathway]))
-                x = self.s3(y)
-                x = self.s4(x)
-                x = self.s5(x)
-                x = torch.cat(x, 1)
-                x = self.avg_pool(x)
-                x = torch.flatten(x, 1)
+        if return_bg_embs:
+            for k, v in x.items():
+                if (k != "mask") and (k != "utm") and (k != "fg_frames"):
+                    with torch.no_grad():
+                        x = v[:]
+                        x = self.s1(x)
+                        x = self.s2(x)
+                        y = (
+                            []
+                        )  # Don't modify x list in place due to activation checkpoint.
+                        for pathway in range(self.num_pathways):
+                            pool = getattr(self, "pathway{}_pool".format(pathway))
+                            y.append(pool(x[pathway]))
+                        x = self.s3(y)
+                        x = self.s4(x)
+                        x = self.s5(x)
+                        x = torch.cat(x, 1)
+                        x = self.avg_pool(x)
+                        x = torch.flatten(x, 1)
 
-                emb_dict[k] = x
+                        emb_dict[k] = x
 
-        # Create a tensor of boolean values for negative foregrounds
-        # mask = torch.tensor(mask, dtype=torch.bool)
-        mask = mask.clone().detach().bool()
-
-        if (self.training) and (not return_bg_embs):
-            if global_bg_embs is not None:
-                # create fake embs
-                # emb_list = []
-                # for i, (k, v) in enumerate(global_bg_embs.items()):
-                #    emb_list.append(v)
-                #    if i == 3:
-                #        break
-                # embs = emb_dict["fg_frames"] - torch.stack(emb_list)
-
-                # Mix embeddings based on global fg embs
-                embs = self.mix_fg_bg(
-                    emb_dict["fg_frames"],
-                    emb_dict["bg_frames"],
-                    mask,
-                    utm,
-                    global_bg_embs,
-                    subtract_global=self.subtract_global,
-                    add_global=self.add_global,
-                )
-            else:
-                # Mix embeddings based on the batch
-                embs = self.mix_fg_bg(
-                    emb_dict["fg_frames"],
-                    emb_dict["bg_frames"],
-                    mask,
-                    utm,
-                )
-        elif return_bg_embs:
-            # Return background embeddings
             embs = emb_dict["bg_frames"]
             return embs, utm
         else:
-            embs = emb_dict["fg_frames"]
+            for k, v in x.items():
+                if (k != "mask") and (k != "utm"):
+                    with torch.no_grad():
+                        x = v[:]  # avoid pass by reference
+                        x = self.s1(x)
+                        x = self.s2(x)
+                        y = (
+                            []
+                        )  # Don't modify x list in place due to activation checkpoint.
+                        for pathway in range(self.num_pathways):
+                            pool = getattr(self, "pathway{}_pool".format(pathway))
+                            y.append(pool(x[pathway]))
+                        x = self.s3(y)
+                        x = self.s4(x)
+                        x = self.s5(x)
+                        x = torch.cat(x, 1)
+                        x = self.avg_pool(x)
+                        x = torch.flatten(x, 1)
 
-        # Project to N dim
-        x = self.projection(embs)
-        return x
+                        emb_dict[k] = x
+
+            mask = mask.clone().detach().bool()
+
+            if self.training:
+                if global_bg_embs is not None:
+                    embs = self.mix_fg_bg(
+                        emb_dict["fg_frames"],
+                        emb_dict["bg_frames"],
+                        mask,
+                        utm,
+                        global_bg_embs,
+                        subtract_global=self.subtract_global,
+                        add_global=self.add_global,
+                    )
+                else:
+                    # Mix embeddings based on the batch
+                    embs = self.mix_fg_bg(
+                        emb_dict["fg_frames"],
+                        emb_dict["bg_frames"],
+                        mask,
+                        utm,
+                    )
+            else:
+                embs = emb_dict["fg_frames"]
+
+            # Project to N dim
+            x = self.projection(embs)
+            return x
 
     def mix_fg_bg(
         self,
