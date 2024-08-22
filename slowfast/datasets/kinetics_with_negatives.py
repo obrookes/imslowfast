@@ -694,9 +694,12 @@ class Nkinetics(torch.utils.data.Dataset):
                         {},
                     )
 
+            # Select random int between 0 and cfg.NUM_FRAMES - 2
+            s = np.random.randint(0, self.cfg.DATA.NUM_FRAMES - 2)
+
             # Reduce temporal dimension of bg to 1
-            bg_frames[0] = bg_frames[0][:, 7:8, :, :]
-            bg2_frames[0] = bg2_frames[0][:, 7:8, :, :]
+            bg_frames[0] = bg_frames[0][:, s : s + 1, :, :]
+            bg2_frames[0] = bg2_frames[0][:, s : s + 1, :, :]
 
             inputs = {
                 "fg_frames": fg_frames,
