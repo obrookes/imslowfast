@@ -1454,22 +1454,21 @@ class ResNetFGBGMixup(nn.Module):
         utm = x["utm"]
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
-                with torch.no_grad():
-                    x = v[:]  # avoid pass by reference
-                    x = self.s1(x)
-                    x = self.s2(x)
-                    y = []  # Don't modify x list in place due to activation checkpoint.
-                    for pathway in range(self.num_pathways):
-                        pool = getattr(self, "pathway{}_pool".format(pathway))
-                        y.append(pool(x[pathway]))
-                    x = self.s3(y)
-                    x = self.s4(x)
-                    x = self.s5(x)
-                    x = torch.cat(x, 1)
-                    x = self.avg_pool(x)
-                    x = torch.flatten(x, 1)
+                x = v[:]  # avoid pass by reference
+                x = self.s1(x)
+                x = self.s2(x)
+                y = []  # Don't modify x list in place due to activation checkpoint.
+                for pathway in range(self.num_pathways):
+                    pool = getattr(self, "pathway{}_pool".format(pathway))
+                    y.append(pool(x[pathway]))
+                x = self.s3(y)
+                x = self.s4(x)
+                x = self.s5(x)
+                x = torch.cat(x, 1)
+                x = self.avg_pool(x)
+                x = torch.flatten(x, 1)
 
-                    emb_dict[k] = x
+                emb_dict[k] = x
 
         # Create a tensor of boolean values for negative foregrounds
         # mask = torch.tensor(mask, dtype=torch.bool)
