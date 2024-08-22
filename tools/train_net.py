@@ -127,6 +127,11 @@ def calculate_embeddings(cfg, model, train_loader, reduction="average"):
             embs.append(embeddings)
             utms.append(utm)
 
+        assert len(embs) == len(utms)
+
+        if len(embs) > 250:
+            break
+
     # Concatenate embeddings and utms
     embs = torch.cat(embs, dim=0)  # [N, 2048]
     utms = torch.cat(utms, dim=0)  # [N]
