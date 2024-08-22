@@ -124,8 +124,13 @@ def calculate_embeddings(cfg, model, train_loader, reduction="average"):
 
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
             embeddings, utm = model(inputs, return_bg_embs=True)
-            embs.append(embeddings.to("cpu"))
-            utms.append(utm.to("cpu"))
+            embs.append(embeddings)
+            utms.append(utm)
+
+        assert len(embs) == len(utms)
+
+        if len(embs) > 250:
+            break
 
     # Concatenate embeddings and utms
     embs = torch.cat(embs, dim=0)  # [N, 2048]
