@@ -1,10 +1,12 @@
 dataset/videos/
+dataset/videos_exp/
+dataset/videos_neg_only/
+dataset/videos_neg_static/
 dataset/results/
 dataset/gradcam/videos/
 dataset/annotations/
 dataset/metadata/metadata.csv
 dataset/metadata/metadata_with_desc.csv
-slowfast/
 catboost_info/
 weights/
 
@@ -17,6 +19,11 @@ model=slow_r50_ds=panaf_seq_with_negatives-epoch=040/
 model=slow_r50_ds=panaf_seq_with_negatives-epoch=100/
 model=slow_r50_ds=panaf_seq_with_negatives-epoch=160/
 model=slow_r50_ds=panaf_seq_with_negatives-epoch=200/
+model=slow_r50_ds=panaf_seq_with_negatives-epoch=100-exp/
+model=slow_r50_ds=panaf_seq_with_negatives-epoch=100-exp-true_label/
+model=slow_r50_ds=panaf_seq_with_negatives-epoch=100-neg_only/
+model=slow_r50_ds=panaf_seq_with_negatives-epoch=101/
+model=slow_r50_ds=panaf_seq_with_negatives-epoch=103/
 
 vision/
 .vscode/
@@ -26,7 +33,8 @@ data/
 *.DS_Store
 *.pyth
 *.pkl
-*.log    
+*.log  
+*.mp4  
 *.csv    
 *.pdf    
 *.png    

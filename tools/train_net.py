@@ -5,11 +5,12 @@
 
 import math
 import pickle as pkl
-import numpy as np
 import pprint
+
+import numpy as np
 import torch
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
-import torchmetrics
+
 import slowfast.models.losses as losses
 import slowfast.models.optimizer as optim
 import slowfast.utils.checkpoint as cu
@@ -21,12 +22,12 @@ import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.datasets.mixup import MixUp
 from slowfast.models import build_model
-from slowfast.models.head_helper import ResNetBasicHead
 from slowfast.models.contrastive import (
     contrastive_forward,
     contrastive_parameter_surgery,
 )
-from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter, get_map
+from slowfast.models.head_helper import ResNetBasicHead
+from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 
 logger = logging.get_logger(__name__)
@@ -108,305 +109,321 @@ def train_epoch(
     model.train()
     train_meter.iter_tic()
     data_size = len(train_loader)
+    # last_iter = len(train_loader)
 
-    if cfg.MIXUP.ENABLE:
-        mixup_fn = MixUp(
-            mixup_alpha=cfg.MIXUP.ALPHA,
-            cutmix_alpha=cfg.MIXUP.CUTMIX_ALPHA,
-            mix_prob=cfg.MIXUP.PROB,
-            switch_prob=cfg.MIXUP.SWITCH_PROB,
-            label_smoothing=cfg.MIXUP.LABEL_SMOOTH_VALUE,
-            num_classes=cfg.MODEL.NUM_CLASSES,
-        )
+    with torch.autograd.set_detect_anomaly(True):
+        if cfg.MIXUP.ENABLE:
+            mixup_fn = MixUp(
+                mixup_alpha=cfg.MIXUP.ALPHA,
+                cutmix_alpha=cfg.MIXUP.CUTMIX_ALPHA,
+                mix_prob=cfg.MIXUP.PROB,
+                switch_prob=cfg.MIXUP.SWITCH_PROB,
+                label_smoothing=cfg.MIXUP.LABEL_SMOOTH_VALUE,
+                num_classes=cfg.MODEL.NUM_CLASSES,
+            )
 
-    if cfg.MODEL.FROZEN_BN:
-        misc.frozen_bn_stats(model)
-    # Explicitly declare reduction to mean.
-    loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+        if cfg.MODEL.FROZEN_BN:
+            misc.frozen_bn_stats(model)
 
-    for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
-        # Transfer the data to the current GPU device.
-        if cfg.NUM_GPUS:
-            if isinstance(inputs, (list,)):
-                for i in range(len(inputs)):
-                    if isinstance(inputs[i], (list,)):
-                        for j in range(len(inputs[i])):
-                            inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
-                    else:
-                        inputs[i] = inputs[i].cuda(non_blocking=True)
-            elif isinstance(inputs, (dict,)):
-                for key, val in inputs.items():
+        # bg_model = copy.deepcopy(model)
+
+        # Explicitly declare reduction to mean.
+        loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+
+        for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
+            # Transfer the data to the current GPU device.
+            if cfg.NUM_GPUS:
+                if isinstance(inputs, (list,)):
+                    for i in range(len(inputs)):
+                        if isinstance(inputs[i], (list,)):
+                            for j in range(len(inputs[i])):
+                                inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
+                        else:
+                            inputs[i] = inputs[i].cuda(non_blocking=True)
+                elif isinstance(inputs, (dict,)):
+                    for key, val in inputs.items():
+                        if isinstance(val, (list,)):
+                            for i in range(len(val)):
+                                if isinstance(val[i], (list,)):
+                                    for j in range(len(val[i])):
+                                        val[i][j] = val[i][j].cuda(non_blocking=True)
+                                else:
+                                    try:
+                                        val[i] = val[i].cuda(non_blocking=True)
+                                    except:
+                                        continue
+                        else:
+                            inputs[key] = val.cuda(non_blocking=True)
+                else:
+                    inputs = inputs.cuda(non_blocking=True)
+                if not isinstance(labels, list):
+                    labels = labels.cuda(non_blocking=True)
+                    index = index.cuda(non_blocking=True)
+                    time = time.cuda(non_blocking=True)
+                for key, val in meta.items():
                     if isinstance(val, (list,)):
                         for i in range(len(val)):
-                            if isinstance(val[i], (list,)):
-                                for j in range(len(val[i])):
-                                    val[i][j] = val[i][j].cuda(non_blocking=True)
+                            if not isinstance(val[i], str):
+                                val[i] = val[i].cuda(non_blocking=True)
                             else:
-                                try:
-                                    val[i] = val[i].cuda(non_blocking=True)
-                                except:
-                                    continue
+                                continue
                     else:
-                        inputs[key] = val.cuda(non_blocking=True)
-            else:
-                inputs = inputs.cuda(non_blocking=True)
-            if not isinstance(labels, list):
-                labels = labels.cuda(non_blocking=True)
-                index = index.cuda(non_blocking=True)
-                time = time.cuda(non_blocking=True)
-            for key, val in meta.items():
-                if isinstance(val, (list,)):
-                    for i in range(len(val)):
-                        if not isinstance(val[i], str):
-                            val[i] = val[i].cuda(non_blocking=True)
-                        else:
-                            continue
+                        meta[key] = val.cuda(non_blocking=True)
+
+            try:
+                batch_size = (
+                    inputs[0][0].size(0)
+                    if isinstance(inputs[0], list)
+                    else inputs[0].size(0)
+                )
+            except:
+                batch_size = (
+                    inputs["fg_frames"][0].size(0)
+                    if isinstance(inputs, dict)
+                    else inputs["fg_frames"].size(0)
+                )
+            # Update the learning rate.
+            epoch_exact = cur_epoch + float(cur_iter) / data_size
+            lr = optim.get_epoch_lr(epoch_exact, cfg)
+            optim.set_lr(optimizer, lr)
+
+            train_meter.data_toc()
+            if cfg.MIXUP.ENABLE:
+                samples, labels = mixup_fn(inputs[0], labels)
+                inputs[0] = samples
+
+            with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
+                # Explicitly declare reduction to mean.
+                perform_backward = True
+                optimizer.zero_grad()
+
+                # Forward pass model
+                if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
+                    (
+                        model,
+                        preds,
+                        partial_loss,
+                        perform_backward,
+                    ) = contrastive_forward(
+                        model, cfg, inputs, index, time, epoch_exact, scaler
+                    )
+                elif cfg.DETECTION.ENABLE:
+                    # Compute the predictions.
+                    preds = model(inputs, meta["boxes"])
+                elif cfg.MASK.ENABLE:
+                    preds, labels = model(inputs)
+                elif cfg.AUG.MANIFOLD_MIXUP:
+                    if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
+                        preds, y_a, y_b, lam = model(inputs, labels)
+                    elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                        preds, y_a, y_b, y_c, lam1, lam2 = model(inputs, labels)
+                    else:
+                        raise NotImplementedError(
+                            "Manifold Mixup requires pairs or triplets"
+                        )
                 else:
-                    meta[key] = val.cuda(non_blocking=True)
+                    preds = model(inputs)
 
-        try:
-            batch_size = (
-                inputs[0][0].size(0)
-                if isinstance(inputs[0], list)
-                else inputs[0].size(0)
-            )
-        except:
-            batch_size = (
-                inputs["fg_frames"][0].size(0)
-                if isinstance(inputs, dict)
-                else inputs["fg_frames"].size(0)
-            )
-        # Update the learning rate.
-        epoch_exact = cur_epoch + float(cur_iter) / data_size
-        lr = optim.get_epoch_lr(epoch_exact, cfg)
-        optim.set_lr(optimizer, lr)
-
-        train_meter.data_toc()
-        if cfg.MIXUP.ENABLE:
-            samples, labels = mixup_fn(inputs[0], labels)
-            inputs[0] = samples
-
-        with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
-
-            # Explicitly declare reduction to mean.
-            perform_backward = True
-            optimizer.zero_grad()
-
-            # Forward pass model
-            if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                (
-                    model,
-                    preds,
-                    partial_loss,
-                    perform_backward,
-                ) = contrastive_forward(
-                    model, cfg, inputs, index, time, epoch_exact, scaler
-                )
-            elif cfg.DETECTION.ENABLE:
-                # Compute the predictions.
-                preds = model(inputs, meta["boxes"])
-            elif cfg.MASK.ENABLE:
-                preds, labels = model(inputs)
-            elif cfg.AUG.MANIFOLD_MIXUP:
-                if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
-                    preds, y_a, y_b, lam = model(inputs, labels)
-                elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
-                    preds, y_a, y_b, y_c, lam1, lam2 = model(inputs, labels)
+                # Get labels and compute the loss.
+                if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
+                    labels = torch.zeros(
+                        preds.size(0), dtype=labels.dtype, device=labels.device
+                    )
+                if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
+                    loss = partial_loss
+                elif cfg.AUG.MANIFOLD_MIXUP:
+                    if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
+                        l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(
+                            preds, y_b
+                        )
+                        loss = l.mean()
+                    elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                        l = (
+                            lam1 * loss_fun(preds, y_a)
+                            + lam2 * loss_fun(preds, y_b)
+                            + (1 - lam1 - lam2) * loss_fun(preds, y_c)
+                        )
+                        loss = l.mean()
+                elif cfg.DATA.PSEUDO_LABELS:
+                    loss = (
+                        calculate_loss_with_pseudo_labels(
+                            preds, labels, loss_fun, pseudo_labels
+                        )
+                        * cfg.DATA.PSEUDO_LABELS_WEIGHT
+                    ) + loss_fun(preds, labels)
                 else:
-                    raise NotImplementedError(
-                        "Manifold Mixup requires pairs or triplets"
-                    )
+                    # Compute the loss.
+                    loss = loss_fun(preds, labels)
+
+            loss_extra = None
+            if isinstance(loss, (list, tuple)):
+                loss, loss_extra = loss
+
+            # check Nan Loss.
+            misc.check_nan_losses(loss)
+
+            if perform_backward:
+                scaler.scale(loss).backward()
+            # Unscales the gradients of optimizer's assigned params in-place
+            scaler.unscale_(optimizer)
+            # Clip gradients if necessary
+            if cfg.SOLVER.CLIP_GRAD_VAL:
+                grad_norm = torch.nn.utils.clip_grad_value_(
+                    model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL
+                )
+            elif cfg.SOLVER.CLIP_GRAD_L2NORM:
+                grad_norm = torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM
+                )
             else:
-                preds = model(inputs)
+                grad_norm = optim.get_grad_norm_(model.parameters())
+            # Update the parameters. (defaults to True)
+            model, update_param = contrastive_parameter_surgery(
+                model, cfg, epoch_exact, cur_iter
+            )
+            if update_param:
+                scaler.step(optimizer)
+            scaler.update()
 
-            # Get labels and compute the loss.
-            if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                labels = torch.zeros(
-                    preds.size(0), dtype=labels.dtype, device=labels.device
+            if cfg.MIXUP.ENABLE:
+                _top_max_k_vals, top_max_k_inds = torch.topk(
+                    labels, 2, dim=1, largest=True, sorted=True
                 )
-            if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
-                loss = partial_loss
-            elif cfg.AUG.MANIFOLD_MIXUP:
-                if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
-                    l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
-                    loss = l.mean()
-                elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
-                    l = (
-                        lam1 * loss_fun(preds, y_a)
-                        + lam2 * loss_fun(preds, y_b)
-                        + (1 - lam1 - lam2) * loss_fun(preds, y_c)
+                idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:, 0]
+                idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:, 1]
+                preds = preds.detach()
+                preds[idx_top1] += preds[idx_top2]
+                preds[idx_top2] = 0.0
+                labels = top_max_k_inds[:, 0]
+
+            if cfg.DETECTION.ENABLE:
+                if cfg.NUM_GPUS > 1:
+                    loss = du.all_reduce([loss])[0]
+                loss = loss.item()
+
+                # Update and log stats.
+                train_meter.update_stats(None, None, None, loss, lr)
+                # write to tensorboard format if available.
+                if writer is not None:
+                    writer.add_scalars(
+                        {"Train/loss": loss, "Train/lr": lr},
+                        global_step=data_size * cur_epoch + cur_iter,
                     )
-                    loss = l.mean()
-            elif cfg.DATA.PSEUDO_LABELS:
-                loss = (
-                    calculate_loss_with_pseudo_labels(
-                        preds, labels, loss_fun, pseudo_labels
-                    )
-                    * cfg.DATA.PSEUDO_LABELS_WEIGHT
-                ) + loss_fun(preds, labels)
+
             else:
-                # Compute the loss.
-                loss = loss_fun(preds, labels)
-
-        loss_extra = None
-        if isinstance(loss, (list, tuple)):
-            loss, loss_extra = loss
-
-        # check Nan Loss.
-        misc.check_nan_losses(loss)
-        if perform_backward:
-            scaler.scale(loss).backward()
-        # Unscales the gradients of optimizer's assigned params in-place
-        scaler.unscale_(optimizer)
-        # Clip gradients if necessary
-        if cfg.SOLVER.CLIP_GRAD_VAL:
-            grad_norm = torch.nn.utils.clip_grad_value_(
-                model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL
-            )
-        elif cfg.SOLVER.CLIP_GRAD_L2NORM:
-            grad_norm = torch.nn.utils.clip_grad_norm_(
-                model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM
-            )
-        else:
-            grad_norm = optim.get_grad_norm_(model.parameters())
-        # Update the parameters. (defaults to True)
-        model, update_param = contrastive_parameter_surgery(
-            model, cfg, epoch_exact, cur_iter
-        )
-        if update_param:
-            scaler.step(optimizer)
-        scaler.update()
-
-        if cfg.MIXUP.ENABLE:
-            _top_max_k_vals, top_max_k_inds = torch.topk(
-                labels, 2, dim=1, largest=True, sorted=True
-            )
-            idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:, 0]
-            idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:, 1]
-            preds = preds.detach()
-            preds[idx_top1] += preds[idx_top2]
-            preds[idx_top2] = 0.0
-            labels = top_max_k_inds[:, 0]
-
-        if cfg.DETECTION.ENABLE:
-            if cfg.NUM_GPUS > 1:
-                loss = du.all_reduce([loss])[0]
-            loss = loss.item()
-
-            # Update and log stats.
-            train_meter.update_stats(None, None, None, loss, lr)
-            # write to tensorboard format if available.
-            if writer is not None:
-                writer.add_scalars(
-                    {"Train/loss": loss, "Train/lr": lr},
-                    global_step=data_size * cur_epoch + cur_iter,
-                )
-
-        else:
-            top1_err, top5_err = None, None
-            if cfg.DATA.MULTI_LABEL:
-                # Gather all the predictions across all the devices.
-                if cfg.NUM_GPUS > 1:
-                    loss, grad_norm = du.all_reduce([loss, grad_norm])
-                    preds, labels = du.all_gather([preds, labels])
-                # Copy the stats from GPU to CPU (sync point).
-                loss, grad_norm = (
-                    loss.item(),
-                    grad_norm.item(),
-                )
-            elif cfg.MASK.ENABLE:
-                # Gather all the predictions across all the devices.
-                if cfg.NUM_GPUS > 1:
-                    loss, grad_norm = du.all_reduce([loss, grad_norm])
-                    if loss_extra:
-                        loss_extra = du.all_reduce(loss_extra)
-                loss, grad_norm, top1_err, top5_err = (
-                    loss.item(),
-                    grad_norm.item(),
-                    0.0,
-                    0.0,
-                )
-                if loss_extra:
-                    loss_extra = [one_loss.item() for one_loss in loss_extra]
-            else:
-                # Compute the errors.
-                # Compute the errors.
-                num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
-                top1_err, top5_err = [
-                    (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
-                ]
-                # Gather all the predictions across all the devices.
-                if cfg.NUM_GPUS > 1:
-                    loss, grad_norm, top1_err, top5_err = du.all_reduce(
-                        [loss.detach(), grad_norm, top1_err, top5_err]
-                    )
-
-                # Copy the stats from GPU to CPU (sync point).
-                loss, grad_norm, top1_err, top5_err = (
-                    loss.item(),
-                    grad_norm.item(),
-                    top1_err.item(),
-                    top5_err.item(),
-                )
-
-            # Update and log stats.
-            train_meter.update_predictions(preds.detach(), labels.detach())
-            train_meter.update_stats(
-                top1_err,
-                top5_err,
-                loss,
-                lr,
-                grad_norm,
-                batch_size
-                * max(
-                    cfg.NUM_GPUS, 1
-                ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
-                loss_extra,
-            )
-            # write to tensorboard format if available.
-            if writer is not None:
+                top1_err, top5_err = None, None
                 if cfg.DATA.MULTI_LABEL:
-                    writer.add_scalars(
-                        {
-                            "Train/loss": loss,
-                            "Train/lr": lr,
-                        },
-                        global_step=data_size * cur_epoch + cur_iter,
+                    # Gather all the predictions across all the devices.
+                    if cfg.NUM_GPUS > 1:
+                        loss, grad_norm = du.all_reduce([loss, grad_norm])
+                        preds, labels = du.all_gather([preds, labels])
+                    # Copy the stats from GPU to CPU (sync point).
+                    loss, grad_norm = (
+                        loss.item(),
+                        grad_norm.item(),
                     )
+                elif cfg.MASK.ENABLE:
+                    # Gather all the predictions across all the devices.
+                    if cfg.NUM_GPUS > 1:
+                        loss, grad_norm = du.all_reduce([loss, grad_norm])
+                        if loss_extra:
+                            loss_extra = du.all_reduce(loss_extra)
+                    loss, grad_norm, top1_err, top5_err = (
+                        loss.item(),
+                        grad_norm.item(),
+                        0.0,
+                        0.0,
+                    )
+                    if loss_extra:
+                        loss_extra = [one_loss.item() for one_loss in loss_extra]
                 else:
-                    writer.add_scalars(
-                        {
-                            "Train/loss": loss,
-                            "Train/lr": lr,
-                            "Train/Top1_err": top1_err,
-                            "Train/Top5_err": top5_err,
-                        },
-                        global_step=data_size * cur_epoch + cur_iter,
+                    # Compute the errors.
+                    # Compute the errors.
+                    num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+                    top1_err, top5_err = [
+                        (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
+                    ]
+                    # Gather all the predictions across all the devices.
+                    if cfg.NUM_GPUS > 1:
+                        loss, grad_norm, top1_err, top5_err = du.all_reduce(
+                            [loss.detach(), grad_norm, top1_err, top5_err]
+                        )
+
+                    # Copy the stats from GPU to CPU (sync point).
+                    loss, grad_norm, top1_err, top5_err = (
+                        loss.item(),
+                        grad_norm.item(),
+                        top1_err.item(),
+                        top5_err.item(),
                     )
-        train_meter.iter_toc()  # do measure allreduce for this meter
-        train_meter.log_iter_stats(cur_epoch, cur_iter)
-        torch.cuda.synchronize()
-        train_meter.iter_tic()
-    del inputs
 
-    # in case of fragmented memory
-    torch.cuda.empty_cache()
+                # Update and log stats.
+                train_meter.update_predictions(preds.detach(), labels.detach())
+                train_meter.update_stats(
+                    top1_err,
+                    top5_err,
+                    loss,
+                    lr,
+                    grad_norm,
+                    batch_size
+                    * max(
+                        cfg.NUM_GPUS, 1
+                    ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
+                    loss_extra,
+                )
+                # write to tensorboard format if available.
+                if writer is not None:
+                    if cfg.DATA.MULTI_LABEL:
+                        writer.add_scalars(
+                            {
+                                "Train/loss": loss,
+                                "Train/lr": lr,
+                            },
+                            global_step=data_size * cur_epoch + cur_iter,
+                        )
+                    else:
+                        writer.add_scalars(
+                            {
+                                "Train/loss": loss,
+                                "Train/lr": lr,
+                                "Train/Top1_err": top1_err,
+                                "Train/Top5_err": top5_err,
+                            },
+                            global_step=data_size * cur_epoch + cur_iter,
+                        )
+            train_meter.iter_toc()  # do measure allreduce for this meter
+            train_meter.log_iter_stats(cur_epoch, cur_iter)
+            torch.cuda.synchronize()
+            train_meter.iter_tic()
 
-    # Log epoch stats.
-    train_meter.log_epoch_stats(cur_epoch)
+            # for the last iteration, we need to update the model parameters
+            # and log the stats.
 
-    # write to tensorboard format if available.
-    if writer is not None:
-        if cfg.DATA.MULTI_LABEL:
-            writer.add_scalars(
-                {
-                    "Train/micro_mAP": train_meter.micro_map,
-                    "Train/macro_mAP": train_meter.macro_map,
-                },
-                global_step=cur_epoch,
-            )
-            writer.add_scalars({"Train/APs": train_meter.aps}, global_step=cur_epoch)
-    train_meter.reset()
+            # if cur_iter == data_size:
+            #    bg_model = copy.deepcopy(model)
+
+        del inputs
+
+        # in case of fragmented memory
+        torch.cuda.empty_cache()
+
+        # Log epoch stats.
+        train_meter.log_epoch_stats(cur_epoch)
+
+        # write to tensorboard format if available.
+        if writer is not None:
+            if cfg.DATA.MULTI_LABEL:
+                writer.add_scalars(
+                    {
+                        "Train/micro_mAP": train_meter.micro_map,
+                        "Train/macro_mAP": train_meter.macro_map,
+                    },
+                    global_step=cur_epoch,
+                )
+                writer.add_scalars(
+                    {"Train/APs": train_meter.aps}, global_step=cur_epoch
+                )
+        train_meter.reset()
 
 
 @torch.no_grad()
@@ -778,7 +795,6 @@ def train(cfg):
 
     epoch_timer = EpochTimer()
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
-
         if cur_epoch > 0 and cfg.DATA.LOADER_CHUNK_SIZE > 0:
             num_chunks = math.ceil(
                 cfg.DATA.LOADER_CHUNK_OVERALL_SIZE / cfg.DATA.LOADER_CHUNK_SIZE

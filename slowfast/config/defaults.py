@@ -853,6 +853,20 @@ _C.DATA.PSEUDO_LABELS = ""
 _C.DATA.PSEUDO_LABELS_WEIGHT = 1.0
 
 # ---------------------------------------------------------------------------- #
+# FG-BG Mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FG_BG_MIXUP = CfgNode()
+
+_C.FG_BG_MIXUP.ENABLE = False
+
+_C.FG_BG_MIXUP.GLOBAL_BG = False
+
+_C.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG = False
+
+_C.FG_BG_MIXUP.ADD_GLOBAL_BG = False
+
+# ---------------------------------------------------------------------------- #
 # Optimizer options
 # ---------------------------------------------------------------------------- #
 _C.SOLVER = CfgNode()

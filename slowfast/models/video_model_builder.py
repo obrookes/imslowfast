@@ -2,9 +2,11 @@
 
 
 """Video models."""
+
 import json
 import math
 from functools import partial
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -1261,6 +1263,8 @@ class ResNetFGBGMixup(nn.Module):
         self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
+        self.subtract_global = cfg.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG
+        self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1400,7 +1404,8 @@ class ResNetFGBGMixup(nn.Module):
             norm_module=self.norm_module,
         )
 
-        self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        # self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
         if self.enable_detection:
             self.head = head_helper.ResNetRoIHead(
@@ -1439,10 +1444,9 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x, bboxes=None):
-        emb_dict = {}
+    def forward(self, x):
+        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
-        utm = x["utm"]
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
                 x = v[:]  # avoid pass by reference
@@ -1461,36 +1465,41 @@ class ResNetFGBGMixup(nn.Module):
 
                 emb_dict[k] = x
 
-        # Create a tensor of boolean values for negative foregrounds
-        mask = torch.tensor(mask, dtype=torch.bool)
+        mask = mask.clone().detach().bool()
+
         if self.training:
-            # Mix embeddings based on the given criteria
+            # Mix embeddings based on the batch
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"],
                 emb_dict["bg_frames"],
+                emb_dict["bg2_frames"],
                 mask,
-                utm,
             )
         else:
             embs = emb_dict["fg_frames"]
+
         # Project to N dim
         x = self.projection(embs)
         return x
 
-    def mix_fg_bg(self, fg_embs, bg_embs, mask, utm):
+    def mix_fg_bg(
+        self,
+        fg_embs,
+        bg_embs,
+        bg2_embs,
+        mask,
+    ):
         """
         Process video embeddings based on the given criteria and UTM locations using PyTorch.
 
         Args:
         foreground_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
         background_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-        labels: torch.Tensor of shape (batch_size, num_classes)
+        background2_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
         mask: torch.Tensor of shape (batch_size,), True for negative foregrounds
-        utm: torch.Tensor of shape (batch_size,) or (batch_size, utm_dim)
 
         Returns:
         processed_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-        processed_labels: torch.Tensor of shape (batch_size, num_classes)
         """
 
         # Create copies to avoid modifying the original tensors
@@ -1499,39 +1508,14 @@ class ResNetFGBGMixup(nn.Module):
         # Create a boolean mask for positive foregrounds
         positive_mask = ~mask
 
-        # Subtract background from foreground for positive samples
-        background_subtracted = fg_embs[positive_mask] - bg_embs[positive_mask]
-
-        # For each positive sample, find a background from a different UTM
         positive_indices = torch.where(positive_mask)[0]
+
         for i in positive_indices:
-            # Find indices of samples with different UTM
-            if utm.dim() > 1:
-                different_utm = torch.where((utm != utm[i]).any(dim=1))[0]
-            else:
-                different_utm = torch.where(utm != utm[i])[0]
+            # Subtract background from foreground for positive samples
+            background_subtracted = fg_embs[i] - bg_embs[i]
 
-            # Exclude negative samples from potential backgrounds
-            valid_backgrounds = torch.tensor(
-                list(set(different_utm.tolist()) & set(torch.where(~mask)[0].tolist()))
-            )
-
-            if len(valid_backgrounds) > 0:
-                # Randomly select one of the valid backgrounds
-                selected_bg_index = valid_backgrounds[
-                    torch.randint(len(valid_backgrounds), (1,))
-                ].item()
-
-                # Add the background-subtracted embedding to the selected background
-                processed_embeddings[i] = (
-                    background_subtracted[torch.where(positive_mask)[0] == i]
-                    + bg_embs[selected_bg_index]
-                )
-            else:
-                # If no valid background found, keep the background-subtracted embedding
-                processed_embeddings[i] = background_subtracted[
-                    torch.where(positive_mask)[0] == i
-                ]
+            # Add background to subtracted embeddings
+            processed_embeddings[i] = background_subtracted + bg2_embs[i]
 
         return processed_embeddings
 
@@ -1839,7 +1823,6 @@ class MViT(nn.Module):
         input_size = self.patch_dims
 
         if self.enable_rev:
-
             # rev does not allow cls token
             assert not self.cls_embed_on
 
@@ -1855,7 +1838,6 @@ class MViT(nn.Module):
                 self.norm = norm_layer(embed_dim)
 
         else:
-
             self.blocks = nn.ModuleList()
 
             for i in range(depth):
@@ -1994,7 +1976,6 @@ class MViT(nn.Module):
         return names
 
     def _get_pos_embed(self, pos_embed, bcthw):
-
         if len(bcthw) == 4:
             t, h, w = 1, bcthw[-2], bcthw[-1]
         else:

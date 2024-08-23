@@ -298,16 +298,53 @@ class Nkinetics(torch.utils.data.Dataset):
                     )
                 )
 
+            # Get all unique utms
+            unique_utms = list(set(self._utms))
+
+            # Select a random utm from the list of unique utms
+            random_utm = random.choice(unique_utms)
+            while random_utm == self._utms[index]:
+                random_utm = random.choice(unique_utms)
+
+            # Find all indices for background videos with the selected utm
+            bg_indices = [i for i, x in enumerate(self._utms) if x == random_utm]
+
+            # Select a random index from the list of background indices
+            random_bg_index = random.choice(bg_indices)
+
+            assert (
+                random_utm != self._utms[index]
+            ), f"UTM {random_utm} is the same as {self._utms[index]}"
+
+            try:
+                video_bg2_container = container.get_video_container(
+                    self._path_to_bg_videos[random_bg_index],
+                    self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
+                    self.cfg.DATA.DECODING_BACKEND,
+                )
+            except Exception as e:
+                logger.info(
+                    "Failed to load second background video from {} with error {}".format(
+                        self._path_to_bg_videos[random_bg_index], e
+                    )
+                )
+
                 if self.mode not in ["test"]:
                     # let's try another one
                     index = random.randint(0, len(self._path_to_fg_videos) - 1)
                 continue  # Select a random video if the current video was not able to access.
-            if (video_fg_container is None) or (video_bg_container is None):
+
+            if (
+                (video_fg_container is None)
+                or (video_bg_container is None)
+                or (video_bg2_container is None)
+            ):
                 logger.warning(
-                    "Failed to meta load video idx {} from {} or {}; trial {}".format(
+                    "Failed to meta load video idx {} from {} or {} or {}; trial {}".format(
                         index,
                         self._path_to_fg_videos[index],
                         self._path_to_bg_videos[index],
+                        self._path_to_bg_videos[random_bg_index],
                         i_try,
                     )
                 )
@@ -390,8 +427,30 @@ class Nkinetics(torch.utils.data.Dataset):
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
             )
 
+            bg2_frames, _, _ = decoder.decode(
+                video_bg2_container,
+                sampling_rate,
+                num_frames,
+                temporal_sample_index,
+                self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
+                video_meta=(
+                    self._video_meta[index] if len(self._video_meta) < 5e6 else {}
+                ),  # do not cache on huge datasets
+                target_fps=target_fps,
+                backend=self.cfg.DATA.DECODING_BACKEND,
+                use_offset=self.cfg.DATA.USE_OFFSET_SAMPLING,
+                max_spatial_scale=(
+                    min_scale[0] if all(x == min_scale[0] for x in min_scale) else 0
+                ),  # if self.mode in ["test"] else 0,
+                time_diff_prob=self.p_convert_dt if self.mode in ["train"] else 0.0,
+                temporally_rnd_clips=True,
+                min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
+                max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
+            )
+
             fg_frames_decoded = fg_frames
             bg_frames_decoded = bg_frames
+            bg2_frames_decoded = bg2_frames
             time_idx_decoded = time_idx
 
             # If decoding failed (wrong format, video is too short, and etc),
@@ -399,14 +458,17 @@ class Nkinetics(torch.utils.data.Dataset):
             if (
                 (fg_frames_decoded is None)
                 or (bg_frames_decoded is None)
+                or (bg2_frames_decoded is None)
                 or (None in fg_frames_decoded)
                 or (None in bg_frames_decoded)
+                or (None in bg2_frames_decoded)
             ):
                 logger.warning(
-                    "Failed to decode video idx {} from {} or {}; trial {}".format(
+                    "Failed to decode video idx {} from {} or {} or {}; trial {}".format(
                         index,
                         self._path_to_fg_videos[index],
                         self._path_to_bg_videos[index],
+                        self._path_to_bg_videos[random_bg_index],
                         i_try,
                     )
                 )
@@ -425,7 +487,8 @@ class Nkinetics(torch.utils.data.Dataset):
             )
             num_out = num_aug * num_decode
             fg_out, time_idx_out = [None] * num_out, [None] * num_out
-            bg_out, _ = [None] * num_out, [None] * num_out
+            bg_out, bg2_out = [None] * num_out, [None] * num_out
+
             idx = -1
             # Handle label
             label = self._labels[index]
@@ -441,6 +504,7 @@ class Nkinetics(torch.utils.data.Dataset):
                     idx += 1
                     fg_out[idx] = fg_frames_decoded[i].clone()
                     bg_out[idx] = bg_frames_decoded[i].clone()
+                    bg2_out[idx] = bg2_frames_decoded[i].clone()
                     time_idx_out[idx] = time_idx_decoded[i, :]
 
                     fg_out[idx] = fg_out[idx].float()
@@ -467,6 +531,15 @@ class Nkinetics(torch.utils.data.Dataset):
                             gaussan_sigma_min=self.cfg.DATA.SSL_BLUR_SIGMA_MIN,
                             gaussan_sigma_max=self.cfg.DATA.SSL_BLUR_SIGMA_MAX,
                         )
+                        bg2_out[idx] = transform.color_jitter_video_ssl(
+                            bg2_out[idx],
+                            bri_con_sat=self.cfg.DATA.SSL_COLOR_BRI_CON_SAT,
+                            hue=self.cfg.DATA.SSL_COLOR_HUE,
+                            p_convert_gray=self.p_convert_gray,
+                            moco_v2_aug=self.cfg.DATA.SSL_MOCOV2_AUG,
+                            gaussan_sigma_min=self.cfg.DATA.SSL_BLUR_SIGMA_MIN,
+                            gaussan_sigma_max=self.cfg.DATA.SSL_BLUR_SIGMA_MAX,
+                        )
 
                     if self.aug and self.cfg.AUG.AA_TYPE:
                         aug_transform = create_random_augment(
@@ -477,6 +550,7 @@ class Nkinetics(torch.utils.data.Dataset):
                         # T H W C -> T C H W.
                         fg_out[idx] = fg_out[idx].permute(0, 3, 1, 2)
                         bg_out[idx] = bg_out[idx].permute(0, 3, 1, 2)
+                        bg2_out[idx] = bg2_out[idx].permute(0, 3, 1, 2)
 
                         fg_list_img = self._frame_to_list_img(fg_out[idx])
                         fg_list_img = aug_transform(fg_list_img)
@@ -484,11 +558,15 @@ class Nkinetics(torch.utils.data.Dataset):
                         bg_list_img = self._frame_to_list_img(bg_out[idx])
                         bg_list_img = aug_transform(bg_list_img)
 
+                        bg2_list_img = self._frame_to_list_img(bg2_out[idx])
+                        bg2_list_img = aug_transform(bg2_list_img)
+
                         fg_out[idx] = self._list_img_to_frames(fg_list_img)
                         bg_out[idx] = self._list_img_to_frames(bg_list_img)
 
                         fg_out[idx] = fg_out[idx].permute(0, 2, 3, 1)
                         bg_out[idx] = bg_out[idx].permute(0, 2, 3, 1)
+                        bg2_out[idx] = bg2_out[idx].permute(0, 2, 3, 1)
 
                     # Perform color normalization.
                     fg_out[idx] = utils.tensor_normalize(
@@ -499,9 +577,14 @@ class Nkinetics(torch.utils.data.Dataset):
                         bg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
                     )
 
+                    bg2_out[idx] = utils.tensor_normalize(
+                        bg2_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
+                    )
+
                     # T H W C -> C T H W.
                     fg_out[idx] = fg_out[idx].permute(3, 0, 1, 2)
                     bg_out[idx] = bg_out[idx].permute(3, 0, 1, 2)
+                    bg2_out[idx] = bg2_out[idx].permute(3, 0, 1, 2)
 
                     scl, asp = (
                         self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE,
@@ -547,6 +630,23 @@ class Nkinetics(torch.utils.data.Dataset):
                         ),
                     )
 
+                    bg2_out[idx] = utils.spatial_sampling(
+                        bg2_out[idx],
+                        spatial_idx=spatial_sample_index,
+                        min_scale=min_scale[i],
+                        max_scale=max_scale[i],
+                        crop_size=crop_size[i],
+                        random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                        inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
+                        aspect_ratio=relative_aspect,
+                        scale=relative_scales,
+                        motion_shift=(
+                            self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
+                            if self.mode in ["train"]
+                            else False
+                        ),
+                    )
+
                     if self.rand_erase:
                         erase_transform = RandomErasing(
                             self.cfg.AUG.RE_PROB,
@@ -559,21 +659,19 @@ class Nkinetics(torch.utils.data.Dataset):
                             fg_out[idx].permute(1, 0, 2, 3)
                         ).permute(1, 0, 2, 3)
 
-                        # Not neccessary to apply random erasing on background
-                        # bg_out[idx] = erase_transform(
-                        #     bg_out[idx].permute(1, 0, 2, 3)
-                        # ).permute(1, 0, 2, 3)
+                        # Not neccessary to apply random erasing on backgrounds...
 
                     fg_out[idx] = utils.pack_pathway_output(self.cfg, fg_out[idx])
                     bg_out[idx] = utils.pack_pathway_output(self.cfg, bg_out[idx])
+                    bg2_out[idx] = utils.pack_pathway_output(self.cfg, bg2_out[idx])
 
                     if self.cfg.AUG.GEN_MASK_LOADER:
                         mask = self._gen_mask()
                         fg_out[idx] = fg_out[idx] + [torch.Tensor(), mask]
-                        # Not neccessary to apply mask on background
-                        # bg_out[idx] = bg_out[idx] + [torch.Tensor(), mask]
+                        # Not neccessary to apply mask on backgrounds...
             fg_frames = fg_out[0] if num_out == 1 else fg_out
             bg_frames = bg_out[0] if num_out == 1 else bg_out
+            bg2_frames = bg2_out[0] if num_out == 1 else bg2_out
             time_idx = np.array(time_idx_out)
             if (
                 num_aug * num_decode > 1
@@ -586,6 +684,7 @@ class Nkinetics(torch.utils.data.Dataset):
                     self.dummy_output = (
                         fg_frames,
                         bg_frames,
+                        bg2_frames,
                         label,
                         negative,
                         utm,
@@ -594,9 +693,18 @@ class Nkinetics(torch.utils.data.Dataset):
                         {},
                         {},
                     )
+
+            # Select random int between 0 and cfg.NUM_FRAMES - 2
+            s = np.random.randint(0, self.cfg.DATA.NUM_FRAMES - 2)
+
+            # Reduce temporal dimension of bg to 1
+            bg_frames[0] = bg_frames[0][:, s : s + 1, :, :]
+            bg2_frames[0] = bg2_frames[0][:, s : s + 1, :, :]
+
             inputs = {
                 "fg_frames": fg_frames,
                 "bg_frames": bg_frames,
+                "bg2_frames": bg2_frames,
                 "mask": negative,
                 "utm": utm,
             }
