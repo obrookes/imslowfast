@@ -4,18 +4,20 @@
 import json
 import logging
 import math
-import numpy as np
 import os
 from datetime import datetime
+
+import numpy as np
 import psutil
 import torch
+import torch.distributed as dist
 import torchvision.io as io
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
 from torch import nn
 from torchvision.utils import make_grid
-import torch.distributed as dist
+
 import slowfast.utils.logging as logging
 import slowfast.utils.multiprocessing as mpu
 from slowfast.datasets.utils import pack_pathway_output
@@ -452,7 +454,23 @@ def launch_job(cfg, init_method, func, daemon=False):
         # cfg.SHARD_ID = rank
         func(cfg=cfg)
     else:
-        func(cfg=cfg)
+        if cfg.NUM_GPUS > 1:
+            torch.multiprocessing.spawn(
+                mpu.run,
+                nprocs=cfg.NUM_GPUS,
+                args=(
+                    cfg.NUM_GPUS,
+                    func,
+                    init_method,
+                    cfg.SHARD_ID,
+                    cfg.NUM_SHARDS,
+                    cfg.DIST_BACKEND,
+                    cfg,
+                ),
+                daemon=daemon,
+            )
+        else:
+            func(cfg=cfg)
 
 
 def get_class_names(path, parent_path=None, subset_path=None):

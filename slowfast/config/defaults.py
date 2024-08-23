@@ -2,7 +2,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Configs."""
+
 import math
+
 from fvcore.common.config import CfgNode
 
 from . import custom_config
@@ -867,6 +869,13 @@ _C.FG_BG_MIXUP.GLOBAL_BG = False
 _C.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG = False
 
 _C.FG_BG_MIXUP.ADD_GLOBAL_BG = False
+
+_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME = CfgNode()
+
+_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.ENABLE = True
+
+_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.DUPLICATE_FRAME = False
+
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options
