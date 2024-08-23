@@ -1265,6 +1265,7 @@ class ResNetFGBGMixup(nn.Module):
         self.num_pathways = 1
         self.subtract_global = cfg.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG
         self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
+        self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1449,21 +1450,56 @@ class ResNetFGBGMixup(nn.Module):
         mask = x["mask"]
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
-                x = v[:]  # avoid pass by reference
-                x = self.s1(x)
-                x = self.s2(x)
-                y = []  # Don't modify x list in place due to activation checkpoint.
-                for pathway in range(self.num_pathways):
-                    pool = getattr(self, "pathway{}_pool".format(pathway))
-                    y.append(pool(x[pathway]))
-                x = self.s3(y)
-                x = self.s4(x)
-                x = self.s5(x)
-                x = torch.cat(x, 1)
-                x = self.avg_pool(x)
-                x = torch.flatten(x, 1)
+                if (k == "bg_frames") or (k == "bg2_frames"):
+                    if self.gen_bg_no_grad:
+                        with torch.no_grad():
+                            x = v[:]
+                            x = self.s1(x)
+                            x = self.s2(x)
+                            y = (
+                                []
+                            )  # Don't modify x list in place due to activation checkpoint.
+                            for pathway in range(self.num_pathways):
+                                pool = getattr(self, "pathway{}_pool".format(pathway))
+                                y.append(pool(x[pathway]))
+                            x = self.s3(y)
+                            x = self.s4(x)
+                            x = self.s5(x)
+                            x = torch.cat(x, 1)
+                            x = self.avg_pool(x)
+                            x = torch.flatten(x, 1)
+                            emb_dict[k] = x
+                    else:
+                        x = v[:]
+                        x = self.s1(x)
+                        x = self.s2(x)
+                        y = []
+                        for pathway in range(self.num_pathways):
+                            pool = getattr(self, "pathway{}_pool".format(pathway))
+                            y.append(pool(x[pathway]))
+                        x = self.s3(y)
+                        x = self.s4(x)
+                        x = self.s5(x)
+                        x = torch.cat(x, 1)
+                        x = self.avg_pool(x)
+                        x = torch.flatten(x, 1)
+                        emb_dict[k] = x
+                else:
+                    x = v[:]  # avoid pass by reference
+                    x = self.s1(x)
+                    x = self.s2(x)
+                    y = []  # Don't modify x list in place due to activation checkpoint.
+                    for pathway in range(self.num_pathways):
+                        pool = getattr(self, "pathway{}_pool".format(pathway))
+                        y.append(pool(x[pathway]))
+                    x = self.s3(y)
+                    x = self.s4(x)
+                    x = self.s5(x)
+                    x = torch.cat(x, 1)
+                    x = self.avg_pool(x)
+                    x = torch.flatten(x, 1)
 
-                emb_dict[k] = x
+                    emb_dict[k] = x
 
         mask = mask.clone().detach().bool()
 
