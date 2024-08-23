@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
-import numpy as np
-import os
 import ast
+import os
 import random
+
+import numpy as np
 import pandas
 import torch
 import torch.utils.data
@@ -694,12 +695,23 @@ class Nkinetics(torch.utils.data.Dataset):
                         {},
                     )
 
-            # Select random int between 0 and cfg.NUM_FRAMES - 2
-            s = np.random.randint(0, self.cfg.DATA.NUM_FRAMES - 2)
+            if self.cfg.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.ENABLE:
+                # Select random int between 0 and cfg.NUM_FRAMES - 2
+                s = np.random.randint(0, self.cfg.DATA.NUM_FRAMES - 2)
+                s1 = np.random.randint(0, self.cfg.DATA.NUM_FRAMES - 2)
 
-            # Reduce temporal dimension of bg to 1
-            bg_frames[0] = bg_frames[0][:, s : s + 1, :, :]
-            bg2_frames[0] = bg2_frames[0][:, s : s + 1, :, :]
+                # Reduce temporal dimension of bg to 1
+                bg_frames[0] = bg_frames[0][:, s : s + 1, :, :]
+                bg2_frames[0] = bg2_frames[0][:, s1 : s1 + 1, :, :]
+
+                # Duplicate frame num_frames times along temporal dimension
+                if self.cfg.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.DUPLICATE_FRAME:
+                    bg_frames[0] = torch.cat(
+                        [bg_frames[0]] * self.cfg.DATA.NUM_FRAMES, 1
+                    )
+                    bg2_frames[0] = torch.cat(
+                        [bg2_frames[0]] * self.cfg.DATA.NUM_FRAMES, 1
+                    )
 
             inputs = {
                 "fg_frames": fg_frames,
