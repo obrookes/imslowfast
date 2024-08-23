@@ -285,18 +285,44 @@ class Nkinetics(torch.utils.data.Dataset):
                         self._path_to_fg_videos[index], e
                     )
                 )
-            try:
-                video_bg_container = container.get_video_container(
-                    self._path_to_bg_videos[index],
-                    self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
-                    self.cfg.DATA.DECODING_BACKEND,
-                )
-            except Exception as e:
-                logger.info(
-                    "Failed to load background video from {} with error {}".format(
-                        self._path_to_bg_videos[index], e
+            if self.cfg.FG_BG_MIXUP.RAND_SUB:
+
+                # get foreground video utm
+                fg_utm = self._utms[index]
+
+                # Find all indices for background videos with the fg_utm
+                matched_bg_indices = [
+                    i for i, x in enumerate(self._utms) if x == fg_utm
+                ]
+
+                # Select a random index from the list of indices
+                matched_bg_index = random.choice(matched_bg_indices)
+
+                try:
+                    video_bg_container = container.get_video_container(
+                        self._path_to_bg_videos[matched_bg_index],
+                        self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
+                        self.cfg.DATA.DECODING_BACKEND,
                     )
-                )
+                except Exception as e:
+                    logger.info(
+                        "Failed to load background video from {} with error {}".format(
+                            self._path_to_bg_videos[matched_bg_index], e
+                        )
+                    )
+            else:
+                try:
+                    video_bg_container = container.get_video_container(
+                        self._path_to_bg_videos[index],
+                        self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
+                        self.cfg.DATA.DECODING_BACKEND,
+                    )
+                except Exception as e:
+                    logger.info(
+                        "Failed to load background video from {} with error {}".format(
+                            self._path_to_bg_videos[index], e
+                        )
+                    )
 
             # Get all unique utms
             unique_utms = list(set(self._utms))
