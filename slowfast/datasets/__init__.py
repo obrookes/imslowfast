@@ -7,6 +7,7 @@ from .charades import Charades  # noqa
 from .imagenet import Imagenet  # noqa
 from .kinetics import Kinetics  # noqa
 from .kinetics_with_negatives import Nkinetics  # noqa
+from .kinetics_with_positives import Pkinetics  # noqa
 from .temporal_action_proposal import Tap  # noqa
 from .ssv2 import Ssv2  # noqa
 

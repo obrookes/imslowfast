@@ -156,7 +156,10 @@ def train_epoch(
                             inputs[key] = val.cuda(non_blocking=True)
                 else:
                     inputs = inputs.cuda(non_blocking=True)
-                if not isinstance(labels, list):
+                if isinstance(labels, dict):
+                    for key, val in labels.items():
+                        labels[key] = val.cuda(non_blocking=True)
+                elif not isinstance(labels, list):
                     labels = labels.cuda(non_blocking=True)
                     index = index.cuda(non_blocking=True)
                     time = time.cuda(non_blocking=True)
@@ -177,11 +180,18 @@ def train_epoch(
                     else inputs[0].size(0)
                 )
             except:
-                batch_size = (
-                    inputs["fg_frames"][0].size(0)
-                    if isinstance(inputs, dict)
-                    else inputs["fg_frames"].size(0)
-                )
+                try:
+                    batch_size = (
+                        inputs["fg_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+                except:
+                    batch_size = (
+                        inputs["f1"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["f1"].size(0)
+                    )
             # Update the learning rate.
             epoch_exact = cur_epoch + float(cur_iter) / data_size
             lr = optim.get_epoch_lr(epoch_exact, cfg)
@@ -221,6 +231,8 @@ def train_epoch(
                         raise NotImplementedError(
                             "Manifold Mixup requires pairs or triplets"
                         )
+                elif cfg.FGFG_MIXUP.ENABLE:
+                    preds, y_a, y_b, lam = model(inputs, labels)
                 else:
                     preds = model(inputs)
 
@@ -251,6 +263,8 @@ def train_epoch(
                         )
                         * cfg.DATA.PSEUDO_LABELS_WEIGHT
                     ) + loss_fun(preds, labels)
+                elif cfg.FGFG_MIXUP:
+                    loss = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
                 else:
                     # Compute the loss.
                     loss = loss_fun(preds, labels)
@@ -357,8 +371,14 @@ def train_epoch(
                         top5_err.item(),
                     )
 
-                # Update and log stats.
-                train_meter.update_predictions(preds.detach(), labels.detach())
+                if cfg.FGFG_MIXUP.ENABLE:
+                    # Update and log stats.
+                    train_meter.update_predictions(
+                        preds.detach(), labels["y1"].detach()
+                    )
+                else:
+                    # Update and log stats.
+                    train_meter.update_predictions(preds.detach(), labels.detach())
                 train_meter.update_stats(
                     top1_err,
                     top5_err,
@@ -460,7 +480,11 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                         inputs[key] = val.cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
-            labels = labels.cuda()
+            if isinstance(labels, dict):
+                for key, val in labels.items():
+                    labels[key] = val.cuda(non_blocking=True)
+            else:
+                labels = labels.cuda()
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
@@ -479,11 +503,18 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                 else inputs[0].size(0)
             )
         except:
-            batch_size = (
-                inputs["fg_frames"][0].size(0)
-                if isinstance(inputs, dict)
-                else inputs["fg_frames"].size(0)
-            )
+            try:
+                batch_size = (
+                    inputs["fg_frames"][0].size(0)
+                    if isinstance(inputs, dict)
+                    else inputs["fg_frames"].size(0)
+                )
+            except:
+                batch_size = (
+                    inputs["f1"][0].size(0)
+                    if isinstance(inputs, dict)
+                    else inputs["f1"].size(0)
+                )
         val_meter.data_toc()
 
         if cfg.DETECTION.ENABLE:
@@ -529,6 +560,8 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                 )
                 preds = torch.sum(probs, 1)
             elif cfg.AUG.MANIFOLD_MIXUP:
+                preds = model(inputs, labels)
+            elif cfg.FGFG_MIXUP.ENABLE:
                 preds = model(inputs, labels)
             else:
                 preds = model(inputs)

@@ -878,6 +878,12 @@ _C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.DUPLICATE_FRAME = False
 
 _C.FG_BG_MIXUP.GEN_BG_NO_GRAD = False
 
+# ---------------------------------------------------------------------------- #
+# FG-FG Mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FGFG_MIXUP = CfgNode()
+_C.FGFG_MIXUP.ENABLE = False
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options

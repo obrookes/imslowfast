@@ -158,6 +158,16 @@ def _get_model_analysis_input(cfg, use_train_input):
             "mask": torch.ones(1),
             "utm": torch.ones(1),
         }
+    elif cfg.FGFG_MIXUP.ENABLE:
+        inputs = {
+            "f1": model_inputs,
+            "f2": model_inputs,
+        }
+        labels = {
+            "y1": torch.rand(1, cfg.MODEL.NUM_CLASSES),
+            "y2": torch.rand(1, cfg.MODEL.NUM_CLASSES),
+        }
+        inputs = (inputs, labels)
     else:
         inputs = (model_inputs,)
     return inputs

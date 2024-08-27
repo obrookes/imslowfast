@@ -831,7 +831,10 @@ class ValMeter:
         """
         # TODO: merge update_prediction with update_stats.
         self.all_preds.append(preds)
-        self.all_labels.append(labels)
+        if self._cfg.FGFG_MIXUP.ENABLE:
+            self.all_labels.append(labels["y1"])
+        else:
+            self.all_labels.append(labels)
 
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
