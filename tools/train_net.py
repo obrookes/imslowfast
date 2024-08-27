@@ -331,7 +331,10 @@ def train_epoch(
                     # Gather all the predictions across all the devices.
                     if cfg.NUM_GPUS > 1:
                         loss, grad_norm = du.all_reduce([loss, grad_norm])
-                        preds, labels = du.all_gather([preds, labels])
+                        if cfg.FGFG_MIXUP.ENABLE:
+                            preds, labels = du.all_gather([preds, labels["y1"]])
+                        else:
+                            preds, labels = du.all_gather([preds, labels])
                     # Copy the stats from GPU to CPU (sync point).
                     loss, grad_norm = (
                         loss.item(),
