@@ -263,7 +263,7 @@ def train_epoch(
                         )
                         * cfg.DATA.PSEUDO_LABELS_WEIGHT
                     ) + loss_fun(preds, labels)
-                elif cfg.FGFG_MIXUP:
+                elif cfg.FGFG_MIXUP.ENABLE:
                     loss = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
                 else:
                     # Compute the loss.

@@ -1266,6 +1266,7 @@ class ResNetFGBGMixup(nn.Module):
         self.subtract_global = cfg.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG
         self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
         self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
+        self.add_random_bg = cfg.FG_BG_MIXUP.ADD_BG
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1329,6 +1330,7 @@ class ResNetFGBGMixup(nn.Module):
         # that are 4X larger than the second largest. Therefore, checkpointing them gives
         # best memory savings. Further tuning is possible for better memory saving and tradeoffs
         # with recomputing FLOPs.
+
         if cfg.MODEL.ACT_CHECKPOINT:
             validate_checkpoint_wrapper_import(checkpoint_wrapper)
             self.s1 = checkpoint_wrapper(s1)
@@ -1498,7 +1500,6 @@ class ResNetFGBGMixup(nn.Module):
                     x = torch.cat(x, 1)
                     x = self.avg_pool(x)
                     x = torch.flatten(x, 1)
-
                     emb_dict[k] = x
 
         mask = mask.clone().detach().bool()
@@ -1547,11 +1548,14 @@ class ResNetFGBGMixup(nn.Module):
         positive_indices = torch.where(positive_mask)[0]
 
         for i in positive_indices:
-            # Subtract background from foreground for positive samples
-            background_subtracted = fg_embs[i] - bg_embs[i]
-
             # Add background to subtracted embeddings
-            processed_embeddings[i] = background_subtracted + bg2_embs[i]
+            if self.add_random_bg:
+                background_subtracted = fg_embs[i] - bg_embs[i]
+                processed_embeddings[i] = background_subtracted + bg2_embs[i]
+            else:
+                # Subtract background embeddings
+                print("==> Here...")
+                processed_embeddings[i] = fg_embs[i] - bg_embs[i]
 
         return processed_embeddings
 

@@ -864,6 +864,8 @@ _C.FG_BG_MIXUP.ENABLE = False
 
 _C.FG_BG_MIXUP.RAND_SUB = False
 
+_C.FG_BG_MIXUP.ADD_BG = True
+
 _C.FG_BG_MIXUP.GLOBAL_BG = False
 
 _C.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG = False
@@ -883,6 +885,7 @@ _C.FG_BG_MIXUP.GEN_BG_NO_GRAD = False
 # ---------------------------------------------------------------------------- #
 
 _C.FGFG_MIXUP = CfgNode()
+
 _C.FGFG_MIXUP.ENABLE = False
 
 # ---------------------------------------------------------------------------- #
