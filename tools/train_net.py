@@ -265,6 +265,7 @@ def train_epoch(
                     ) + loss_fun(preds, labels)
                 elif cfg.FGFG_MIXUP.ENABLE:
                     loss = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                    loss = loss.mean()
                 else:
                     # Compute the loss.
                     loss = loss_fun(preds, labels)
