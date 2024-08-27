@@ -570,7 +570,10 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
 
             if cfg.DATA.MULTI_LABEL:
                 if cfg.NUM_GPUS > 1:
-                    preds, labels = du.all_gather([preds, labels])
+                    if cfg.FGFG_MIXUP.ENABLE:
+                        preds, labels = du.all_gather([preds, labels["y1"]])
+                    else:
+                        preds, labels = du.all_gather([preds, labels])
             else:
                 if cfg.DATA.IN22k_VAL_IN1K != "":
                     preds = preds[:, :1000]
