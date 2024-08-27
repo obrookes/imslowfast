@@ -377,9 +377,7 @@ def train_epoch(
 
                 if cfg.FGFG_MIXUP.ENABLE:
                     # Update and log stats.
-                    train_meter.update_predictions(
-                        preds.detach(), labels["y1"].detach()
-                    )
+                    train_meter.update_predictions(preds.detach(), labels.detach())
                 else:
                     # Update and log stats.
                     train_meter.update_predictions(preds.detach(), labels.detach())
