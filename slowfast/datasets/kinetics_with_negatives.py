@@ -532,12 +532,15 @@ class Nkinetics(torch.utils.data.Dataset):
                     fg_out[idx] = fg_frames_decoded[i].clone()
                     bg_out[idx] = bg_frames_decoded[i].clone()
                     bg2_out[idx] = bg2_frames_decoded[i].clone()
+
                     time_idx_out[idx] = time_idx_decoded[i, :]
 
                     fg_out[idx] = fg_out[idx].float()
                     fg_out[idx] = fg_out[idx] / 255.0
                     bg_out[idx] = bg_out[idx].float()
                     bg_out[idx] = bg_out[idx] / 255.0
+                    bg2_out[idx] = bg2_out[idx].float()
+                    bg2_out[idx] = bg2_out[idx] / 255.0
 
                     if self.mode in ["train"] and self.cfg.DATA.SSL_COLOR_JITTER:
                         fg_out[idx] = transform.color_jitter_video_ssl(
@@ -590,6 +593,7 @@ class Nkinetics(torch.utils.data.Dataset):
 
                         fg_out[idx] = self._list_img_to_frames(fg_list_img)
                         bg_out[idx] = self._list_img_to_frames(bg_list_img)
+                        bg2_out[idx] = self._list_img_to_frames(bg2_list_img)
 
                         fg_out[idx] = fg_out[idx].permute(0, 2, 3, 1)
                         bg_out[idx] = bg_out[idx].permute(0, 2, 3, 1)
