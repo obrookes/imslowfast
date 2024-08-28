@@ -1552,7 +1552,6 @@ class ResNetFGBGMixup(nn.Module):
 
             else:
                 # Subtract background embeddings
-                print("==> Here...")
                 processed_embeddings[i] = fg_embs[i] - bg_embs[i]
 
         return processed_embeddings
