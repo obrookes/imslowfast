@@ -287,7 +287,6 @@ class Nkinetics(torch.utils.data.Dataset):
                     )
                 )
             if self.cfg.FG_BG_MIXUP.RAND_SUB:
-
                 # get foreground video utm
                 fg_utm = self._utms[index]
 

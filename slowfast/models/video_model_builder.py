@@ -1267,6 +1267,7 @@ class ResNetFGBGMixup(nn.Module):
         self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
         self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
         self.add_random_bg = cfg.FG_BG_MIXUP.ADD_BG
+        self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1447,7 +1448,7 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x):
+    def forward(self, x, epsilon=0.0):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
         for k, v in x.items():
@@ -1458,9 +1459,7 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = (
-                                []
-                            )  # Don't modify x list in place due to activation checkpoint.
+                            y = []  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -1504,13 +1503,14 @@ class ResNetFGBGMixup(nn.Module):
 
         mask = mask.clone().detach().bool()
 
-        if self.training:
+        if self.training and self.fg_bg_mixup_enable:
             # Mix embeddings based on the batch
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"],
                 emb_dict["bg_frames"],
                 emb_dict["bg2_frames"],
                 mask,
+                epsilon,
             )
         else:
             embs = emb_dict["fg_frames"]
@@ -1519,13 +1519,7 @@ class ResNetFGBGMixup(nn.Module):
         x = self.projection(embs)
         return x
 
-    def mix_fg_bg(
-        self,
-        fg_embs,
-        bg_embs,
-        bg2_embs,
-        mask,
-    ):
+    def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, epsilon):
         """
         Process video embeddings based on the given criteria and UTM locations using PyTorch.
 
@@ -1552,6 +1546,10 @@ class ResNetFGBGMixup(nn.Module):
             if self.add_random_bg:
                 background_subtracted = fg_embs[i] - bg_embs[i]
                 processed_embeddings[i] = background_subtracted + bg2_embs[i]
+
+            elif epsilon > 0.0:
+                background_subtracted = fg_embs[i] - bg_embs[i] + epsilon * bg_embs[i]
+
             else:
                 # Subtract background embeddings
                 print("==> Here...")
