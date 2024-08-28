@@ -1263,11 +1263,11 @@ class ResNetFGBGMixup(nn.Module):
         self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
-        self.subtract_global = cfg.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG
-        self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
         self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
         self.add_random_bg = cfg.FG_BG_MIXUP.ADD_BG
         self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
+        self.mix_on_eval = cfg.FG_BG_MIXUP.MIX_ON_EVAL
+        self.alpha_max = cfg.FG_BG_MIXUP.BG_ALPHA_MAX
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1459,7 +1459,9 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = []  # Don't modify x list in place due to activation checkpoint.
+                            y = (
+                                []
+                            )  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -1512,6 +1514,15 @@ class ResNetFGBGMixup(nn.Module):
                 mask,
                 epsilon,
             )
+        elif (not self.training) and (self.mix_on_eval):
+            epsilon = 0.0 if self.alpha_max == 0.0 else 1.0
+            embs = self.mix_fg_bg(
+                emb_dict["fg_frames"],
+                emb_dict["bg_frames"],
+                emb_dict["bg2_frames"],
+                mask,
+                epsilon,
+            )
         else:
             embs = emb_dict["fg_frames"]
 
@@ -1540,7 +1551,6 @@ class ResNetFGBGMixup(nn.Module):
         positive_mask = ~mask
 
         positive_indices = torch.where(positive_mask)[0]
-
         for i in positive_indices:
             # Add background to subtracted embeddings
             if self.add_random_bg:
