@@ -1558,8 +1558,7 @@ class ResNetFGBGMixup(nn.Module):
                 processed_embeddings[i] = background_subtracted + bg2_embs[i]
 
             elif epsilon > 0.0:
-                background_subtracted = fg_embs[i] - bg_embs[i] + epsilon * bg_embs[i]
-
+                processed_embeddings[i] = fg_embs[i] - bg_embs[i] + epsilon * bg_embs[i]
             else:
                 # Subtract background embeddings
                 processed_embeddings[i] = fg_embs[i] - bg_embs[i]
