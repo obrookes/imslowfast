@@ -90,7 +90,7 @@ def train_epoch(
     cfg,
     writer=None,
     pseudo_labels=None,
-    epsilon=0.0,
+    alpha=0.0,
 ):
     """
     Perform the video training for one epoch.
@@ -105,7 +105,7 @@ def train_epoch(
             slowfast/config/defaults.py
         writer (TensorboardWriter, optional): TensorboardWriter object
             to writer Tensorboard log.
-        epsilon (float): epsilon value for FG-BG mixup.
+        alpha (float): alpha value for FG-BG mixup.
     """
     # Enable train mode.
     model.train()
@@ -233,7 +233,14 @@ def train_epoch(
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds, y_a, y_b, lam = model(inputs, labels)
             else:
-                preds = model(inputs, epsilon)
+                if (
+                    cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                    and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                ):
+                    beta = 1 - alpha
+                    preds = model(inputs, alpha, beta)
+                else:
+                    preds = model(inputs, alpha)
 
             # Get labels and compute the loss.
             if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
@@ -717,9 +724,9 @@ def train(cfg):
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
 
-    epsilon_scheduler = torch.linspace(
-        cfg.FG_BG_MIXUP.BG_ALPHA_MIN,
-        cfg.FG_BG_MIXUP.BG_ALPHA_MAX,
+    alpha_scheduler = torch.linspace(
+        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
         cfg.SOLVER.MAX_EPOCH,
     )
 
@@ -895,7 +902,7 @@ def train(cfg):
             cfg,
             writer,
             pseudo_labels,
-            epsilon_scheduler[cur_epoch],
+            alpha_scheduler[cur_epoch],
         )
         epoch_timer.epoch_toc()
         logger.info(

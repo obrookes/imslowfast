@@ -21,7 +21,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/full_data
+  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/fgbgmixup
   PATH_PREFIX: /home/kukushkin/imslowfast/dataset/videos/
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
@@ -29,11 +29,13 @@ DATA:
 
 FG_BG_MIXUP:
   ENABLE: True
-  GLOBAL_BG: True
-  SUBTRACT_GLOBAL_BG: False
-  ADD_GLOBAL_BG: True
-  BG_ALPHA_MIN: 0.0
-  BG_ALPHA_MAX: 1.0
+  SUBTRACT_BG: 
+    ENABLE: True
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+  ADD_BG2:
+    ENABLE: False
+    START_FROM_EPOCH: 0
   SELECT_RAND_BG_FRAME:
     ENABLE: False
     DUPLICATE_FRAME: False

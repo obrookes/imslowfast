@@ -1264,10 +1264,11 @@ class ResNetFGBGMixup(nn.Module):
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
         self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
-        self.add_random_bg = cfg.FG_BG_MIXUP.ADD_BG
         self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
         self.mix_on_eval = cfg.FG_BG_MIXUP.MIX_ON_EVAL
-        self.alpha_max = cfg.FG_BG_MIXUP.BG_ALPHA_MAX
+        self.subract_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
+        self.subract_bg_alpha_max = cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX
+        self.add_bg2 = cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1448,7 +1449,7 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x, epsilon=0.0):
+    def forward(self, x, alpha=0.0, beta=None):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
         for k, v in x.items():
@@ -1459,9 +1460,7 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = (
-                                []
-                            )  # Don't modify x list in place due to activation checkpoint.
+                            y = []  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -1512,16 +1511,18 @@ class ResNetFGBGMixup(nn.Module):
                 emb_dict["bg_frames"],
                 emb_dict["bg2_frames"],
                 mask,
-                epsilon,
+                alpha,
+                beta,
             )
         elif (not self.training) and (self.mix_on_eval):
-            epsilon = 0.0 if self.alpha_max == 0.0 else 1.0
+            alpha = 0.0 if self.subract_bg_alpha_max == 0.0 else 1.0
+            # beta must be None so we don't add bg2 embeddings during evaluation
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"],
                 emb_dict["bg_frames"],
                 emb_dict["bg2_frames"],
                 mask,
-                epsilon,
+                alpha,
             )
         else:
             embs = emb_dict["fg_frames"]
@@ -1530,7 +1531,7 @@ class ResNetFGBGMixup(nn.Module):
         x = self.projection(embs)
         return x
 
-    def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, epsilon):
+    def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, alpha, beta=None):
         """
         Process video embeddings based on the given criteria and UTM locations using PyTorch.
 
@@ -1539,6 +1540,8 @@ class ResNetFGBGMixup(nn.Module):
         background_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
         background2_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
         mask: torch.Tensor of shape (batch_size,), True for negative foregrounds
+        alpha: float, alpha value for mixup
+        beta: float, beta value for mixup
 
         Returns:
         processed_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
@@ -1552,17 +1555,31 @@ class ResNetFGBGMixup(nn.Module):
 
         positive_indices = torch.where(positive_mask)[0]
         for i in positive_indices:
-            # Add background to subtracted embeddings
-            if self.add_random_bg:
-                background_subtracted = fg_embs[i] - bg_embs[i]
-                processed_embeddings[i] = background_subtracted + bg2_embs[i]
+            if self.subract_bg:
+                if alpha > 0.0:
+                    # Subtract background embeddings with alpha
+                    background_subtracted = fg_embs[i] - bg_embs[i] * (1 - alpha)
 
-            elif epsilon > 0.0:
-                background_subtracted = fg_embs[i] - bg_embs[i] + epsilon * bg_embs[i]
+                    if self.add_bg2:
+                        # Add background to subtracted embeddings with beta mixup
+                        if beta is not None:
+                            processed_embeddings[i] = (
+                                background_subtracted + bg2_embs[i] * beta
+                            )
+                        else:
+                            # Add background to subtracted embeddings with complete mixup
+                            processed_embeddings[i] = (
+                                background_subtracted + bg2_embs[i]
+                            )
+                    else:
+                        processed_embeddings[i] = background_subtracted
+
+                else:
+                    # Subtract background embeddings
+                    processed_embeddings[i] = fg_embs[i] - bg_embs[i]
 
             else:
-                # Subtract background embeddings
-                processed_embeddings[i] = fg_embs[i] - bg_embs[i]
+                print("Do nothing")
 
         return processed_embeddings
 
@@ -1595,8 +1612,6 @@ class ResNetFGFGMixup(nn.Module):
         self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
-        self.subtract_global = cfg.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG
-        self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
         self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
         self._construct_network(cfg)
         init_helper.init_weights(
