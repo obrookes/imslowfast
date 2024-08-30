@@ -232,7 +232,7 @@ def train_epoch(
                     )
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds, y_a, y_b, lam = model(inputs, labels)
-            else:
+            elif cfg.FG_BG_MIXUP.ENABLE:
                 if (
                     cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
                     and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
@@ -241,6 +241,8 @@ def train_epoch(
                     preds = model(inputs, alpha, beta)
                 else:
                     preds = model(inputs, alpha)
+            else:
+                preds = model(inputs)
 
             # Get labels and compute the loss.
             if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
@@ -451,7 +453,9 @@ def train_epoch(
 
 
 @torch.no_grad()
-def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, writer):
+def eval_epoch(
+    val_loader, model, val_meter, cur_epoch, cfg, train_loader, writer, alpha=0.0
+):
     """
     Evaluate the model on the val set.
     Args:
@@ -567,6 +571,15 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
                 preds = model(inputs, labels)
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds = model(inputs, labels)
+            elif cfg.FG_BG_MIXUP.ENABLE:
+                if (
+                    cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                    and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                ):
+                    beta = 1 - alpha
+                    preds = model(inputs, alpha, beta)
+                else:
+                    preds = model(inputs, alpha)
             else:
                 preds = model(inputs)
 
@@ -969,6 +982,7 @@ def train(cfg):
                 cfg,
                 train_loader,
                 writer,
+                alpha_scheduler[cur_epoch],
             )
     if (
         start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE
