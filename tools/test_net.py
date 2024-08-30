@@ -23,7 +23,7 @@ logger = logging.get_logger(__name__)
 
 
 @torch.no_grad()
-def perform_test(test_loader, model, test_meter, cfg, writer=None):
+def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
     """
     For classification:
     Perform mutli-view testing that uniformly samples N clips from a video along
@@ -58,6 +58,13 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
                     inputs[i] = inputs[i].cuda(non_blocking=True)
+            elif isinstance(inputs, dict):
+                for key, val in inputs.items():
+                    if isinstance(val, (list,)):
+                        for i in range(len(val)):
+                            val[i] = val[i].cuda(non_blocking=True)
+                    else:
+                        inputs[key] = val.cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
             # Transfer the data to the current GPU device.
@@ -119,30 +126,46 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             preds = torch.sum(probs, 1)
         elif cfg.AUG.MANIFOLD_MIXUP:
             out = model(inputs, labels)
-        elif cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
-            # Perform the forward pass.
-            preds, feats, cas = model(inputs)
-        elif cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
-            # Perform the forward pass.
-            out = model(inputs)
+        elif cfg.TEST.RETURN_FEATS:
+            if cfg.TEST.RETURN_CAS:
+                # Perform the forward pass.
+                preds, feats, cas = model(inputs)
+            elif cfg.FG_BG_MIXUP.ENABLE:
+                alpha_scheduler = torch.linspace(
+                    cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+                    cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                    cfg.SOLVER.MAX_EPOCH,
+                )
+                alpha = alpha_scheduler[epoch]
+                if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE:
+                    beta = 1 - alpha
+                    preds = model(inputs, alpha, beta)
+                else:
+                    preds = model(inputs, alpha)
+            else:
+                out = model(inputs)
         else:
             # Perform the forward pass.
             preds = model(inputs)
 
         # all_preds.append(preds)
-        all_names.extend(meta["video_name"])
+        if cfg.FG_BG_MIXUP.ENABLE:
+            all_names.extend(meta["fg_video_name"])
+        else:
+            all_names.extend(meta["video_name"])
 
         # Append outputs following forward pass
-        if cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
-            all_feats.append(feats)
-            all_cas.append(cas)
-            all_preds.append(preds)
-
-        # Append outputs following forward pass
-        if cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
-            preds, feats = out[0], out[1]
-            all_feats.append(feats)
-            all_preds.append(preds)
+        if cfg.TEST.RETURN_FEATS:
+            if cfg.TEST.RETURN_CAS:
+                all_feats.append(feats)
+                all_cas.append(cas)
+                all_preds.append(preds)
+            elif cfg.FG_BG_MIXUP.ENABLE:
+                all_preds.append(preds)
+            else:
+                preds, feats = out[0], out[1]
+                all_feats.append(feats)
+                all_preds.append(preds)
 
         if cfg.TEST.RETURN_CAS and not cfg.TEST.RETURN_FEATS:
             all_cas.append(cas)
@@ -185,17 +208,26 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             logger.info("Successfully saved prediction results to {}".format(save_path))
 
     test_meter.finalize_metrics()
-    if cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
-        return test_meter, all_names, all_preds, torch.cat(all_feats, dim=0), all_labels
-    elif cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
-        return (
-            test_meter,
-            all_names,
-            all_preds,
-            torch.cat(all_cas, dim=0),
-            torch.cat(all_feats, dim=0),
-            all_labels,
-        )
+    if cfg.TEST.RETURN_FEATS:
+        if cfg.TEST.RETURN_CAS:
+            return (
+                test_meter,
+                all_names,
+                all_preds,
+                torch.cat(all_cas, dim=0),
+                torch.cat(all_feats, dim=0),
+                all_labels,
+            )
+        elif cfg.FG_BG_MIXUP.ENABLE:
+            return test_meter, all_names, all_preds, all_labels
+        else:
+            return (
+                test_meter,
+                all_names,
+                all_preds,
+                torch.cat(all_feats, dim=0),
+                all_labels,
+            )
     else:
         return test_meter
 
@@ -249,6 +281,10 @@ def test(cfg):
 
         cu.load_test_checkpoint(cfg, model)
 
+        # Load the checkpoint on CPU to avoid GPU mem spike.
+        with pathmgr.open(cfg.TEST.CHECKPOINT_FILE_PATH, "rb") as f:
+            checkpoint = torch.load(f, map_location="cpu")
+
         # Create video testing loaders.
         test_loader = loader.construct_loader(cfg, "test")
         logger.info("Testing model for {} iterations".format(len(test_loader)))
@@ -284,14 +320,24 @@ def test(cfg):
             writer = None
 
         # # Perform multi-view test on the entire dataset.
-        if cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
-            test_meter, names, preds, cas, feats, labels = perform_test(
-                test_loader, model, test_meter, cfg, writer
-            )
-        elif cfg.TEST.RETURN_FEATS:
-            test_meter, names, preds, feats, labels = perform_test(
-                test_loader, model, test_meter, cfg, writer
-            )
+        if cfg.TEST.RETURN_FEATS:
+            if cfg.TEST.RETURN_CAS:
+                test_meter, names, preds, cas, feats, labels = perform_test(
+                    test_loader, model, test_meter, cfg, writer
+                )
+            elif cfg.FG_BG_MIXUP.ENABLE:
+                test_meter, names, preds, labels = perform_test(
+                    test_loader,
+                    model,
+                    test_meter,
+                    cfg,
+                    writer,
+                    epoch=checkpoint["epoch"],
+                )
+            else:
+                test_meter, names, preds, feats, labels = perform_test(
+                    test_loader, model, test_meter, cfg, writer
+                )
         else:
             perform_test(test_loader, model, test_meter, cfg, writer)
         test_meters.append(test_meter)
@@ -299,16 +345,19 @@ def test(cfg):
             writer.close()
 
     # Dict for storing features and labels
-    if cfg.TEST.RETURN_FEATS and not cfg.TEST.RETURN_CAS:
-        feats = {"names": names, "preds": preds, "feats": feats, "labels": labels}
-    if cfg.TEST.RETURN_FEATS and cfg.TEST.RETURN_CAS:
-        feats = {
-            "names": names,
-            "preds": preds,
-            "cas": cas,
-            "feats": feats,
-            "labels": labels,
-        }
+    if cfg.TEST.RETURN_FEATS:
+        if cfg.TEST.RETURN_CAS:
+            feats = {
+                "names": names,
+                "preds": preds,
+                "cas": cas,
+                "feats": feats,
+                "labels": labels,
+            }
+        elif cfg.FG_BG_MIXUP.ENABLE:
+            feats = {"names": names, "preds": preds, "labels": labels}
+        else:
+            feats = {"names": names, "preds": preds, "feats": feats, "labels": labels}
 
     # Save the output features
     if cfg.TEST.RETURN_FEATS or (cfg.TAP.ENABLE and cfg.TEST.RETURN_CAS):
@@ -331,7 +380,8 @@ def test(cfg):
         result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
 
         result_string = (
-            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}" "".format(
+            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
+            "".format(
                 params / 1e6,
                 flops,
                 view,
