@@ -1460,7 +1460,9 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = []  # Don't modify x list in place due to activation checkpoint.
+                            y = (
+                                []
+                            )  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -1515,7 +1517,7 @@ class ResNetFGBGMixup(nn.Module):
                 beta,
             )
         elif (not self.training) and (self.mix_on_eval):
-            alpha = 0.0 if self.subract_bg_alpha_max == 0.0 else 1.0
+            # alpha = 0.0 if self.subract_bg_alpha_max == 0.0 else 1.0
             # beta must be None so we don't add bg2 embeddings during evaluation
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"],
@@ -1523,6 +1525,7 @@ class ResNetFGBGMixup(nn.Module):
                 emb_dict["bg2_frames"],
                 mask,
                 alpha,
+                beta,
             )
         else:
             embs = emb_dict["fg_frames"]
