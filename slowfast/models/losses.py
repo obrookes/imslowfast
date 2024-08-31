@@ -141,7 +141,7 @@ class MultiHotCrossEntropyLoss(nn.Module):
             sample_loss *= multi_hot_prob
 
             total_loss[i] = sample_loss
-        return total_loss
+        return total_loss.mean()
 
 
 _LOSSES = {
