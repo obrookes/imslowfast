@@ -22,7 +22,7 @@ def read_files(model_results, epoch):
     return train_data, val_data
 
 
-def results2df(train_data, val_data, metadata_df):
+def results2df(train_data, val_data, metadata_df, right_on="subject_id"):
     # Process subclips
     subclips = []
     for i, split in enumerate([train_data, val_data]):
@@ -42,7 +42,7 @@ def results2df(train_data, val_data, metadata_df):
     df = pd.DataFrame(subclips, columns=["name", "split", "pred", "feat", "negative"])
 
     df["split"] = df.split.map({0: "train", 1: "val"})
-    df = df.merge(metadata_df, how="left", left_on="name", right_on="subject_id")
+    df = df.merge(metadata_df, how="left", left_on="name", right_on=right_on)
 
     # Apply sigmoid to predictions
     df["pred"] = df.pred.apply(lambda x: torch.sigmoid(torch.tensor(x)))
