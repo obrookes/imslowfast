@@ -897,6 +897,20 @@ _C.FGFG_MIXUP = CfgNode()
 _C.FGFG_MIXUP.ENABLE = False
 
 # ---------------------------------------------------------------------------- #
+# Unique combination loss options
+# ---------------------------------------------------------------------------- #
+
+_C.UNIQUE_COMBINATION_LOSS = CfgNode()
+
+_C.UNIQUE_COMBINATION_LOSS.ENABLE = False
+
+_C.UNIQUE_COMBINATION_LOSS.BEH_DIST = None
+
+_C.UNIQUE_COMBINATION_LOSS.COMB_DIST = None
+
+_C.UNIQUE_COMBINATION_LOSS.LOSS_SCALE_FACTOR = 100
+
+# ---------------------------------------------------------------------------- #
 # Optimizer options
 # ---------------------------------------------------------------------------- #
 _C.SOLVER = CfgNode()

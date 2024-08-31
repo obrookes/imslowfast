@@ -11,6 +11,8 @@ import numpy as np
 import torch
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 
+import pandas as pd
+
 import slowfast.models.losses as losses
 import slowfast.models.optimizer as optim
 import slowfast.utils.checkpoint as cu
@@ -91,6 +93,8 @@ def train_epoch(
     writer=None,
     pseudo_labels=None,
     alpha=0.0,
+    class_probs=None,
+    combination_probs=None,
 ):
     """
     Perform the video training for one epoch.
@@ -127,7 +131,12 @@ def train_epoch(
         misc.frozen_bn_stats(model)
 
     # Explicitly declare reduction to mean.
-    loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+    if cfg.UNIQUE_COMBINATION_LOSS.ENABLE:
+        loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(
+            class_probs, combination_probs
+        )
+    else:
+        loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
 
     for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
@@ -896,6 +905,21 @@ def train(cfg):
         if hasattr(train_loader.dataset, "_set_epoch_num"):
             train_loader.dataset._set_epoch_num(cur_epoch)
 
+        if cfg.UNIQUE_COMBINATION_LOSS.ENABLE:
+            beh_df = pd.read_pickle(cfg.UNIQUE_COMBINATION_LOSS.BEH_DIST)
+            comb_df = pd.read_pickle(cfg.UNIQUE_COMBINATION_LOSS.COMB_DIST)
+            class_probs = dict(zip(beh_df.index, beh_df.inv_prob))
+            combination_probs = dict(zip(comb_df.label, comb_df.inv_prob))
+            # Scale the values in dict by 100
+            class_probs = {
+                k: v * cfg.UNIQUE_COMBINATION_LOSS.LOSS_SCALE_FACTOR
+                for k, v in class_probs.items()
+            }
+            combination_probs = {
+                k: v * cfg.UNIQUE_COMBINATION_LOSS.LOSS_SCALE_FACTOR
+                for k, v in combination_probs.items()
+            }
+
         # Pseudo labels
         if cfg.DATA.PSEUDO_LABELS:
             with open(cfg.DATA.PSEUDO_LABELS, "rb") as f:
@@ -916,6 +940,8 @@ def train(cfg):
             writer,
             pseudo_labels,
             alpha_scheduler[cur_epoch],
+            class_probs if cfg.UNIQUE_COMBINATION_LOSS.ENABLE else None,
+            combination_probs if cfg.UNIQUE_COMBINATION_LOSS.ENABLE else None,
         )
         epoch_timer.epoch_toc()
         logger.info(
