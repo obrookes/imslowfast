@@ -128,7 +128,6 @@ def train_epoch(
 
     # Explicitly declare reduction to mean.
     loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
-
     for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
@@ -241,6 +240,8 @@ def train_epoch(
                     preds = model(inputs, alpha, beta)
                 else:
                     preds = model(inputs, alpha)
+            elif cfg.FRAMEWISE_MIXUP.ENABLE:
+                preds, lam, index = model(inputs)
             else:
                 preds = model(inputs)
 
@@ -272,6 +273,23 @@ def train_epoch(
             elif cfg.FGFG_MIXUP.ENABLE:
                 loss = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
                 loss = loss.mean()
+            elif cfg.FRAMEWISE_MIXUP.ENABLE:
+                y_a, y_b = labels, labels[index]
+                if lam.size(1) > 1:
+                    # For independent frame mixing
+                    lam = lam.squeeze(-1)  # Shape: (B, T)
+                    loss = 0
+                    for t in range(preds.size(1)):  # Iterate over time steps
+                        loss_t = lam[:, t] * loss_fun(preds[:, t], y_a) + (
+                            1 - lam[:, t]
+                        ) * loss_fun(preds[:, t], y_b)
+                        loss += loss_t.mean()
+                    loss /= preds.size(1)  # Average over time steps
+                else:
+                    # For single lambda per sample
+                    # lam = lam.squeeze()  # Shape: (B,)
+                    loss = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                    loss = loss.mean()
             else:
                 # Compute the loss.
                 loss = loss_fun(preds, labels)
@@ -580,6 +598,8 @@ def eval_epoch(
                     preds = model(inputs, alpha, beta)
                 else:
                     preds = model(inputs, alpha)
+            elif cfg.FRAMEWISE_MIXUP.ENABLE:
+                preds = model(inputs)
             else:
                 preds = model(inputs)
 
