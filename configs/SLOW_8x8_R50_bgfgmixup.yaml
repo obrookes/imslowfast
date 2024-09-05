@@ -33,6 +33,7 @@ FG_BG_MIXUP:
     ENABLE: True
     ALPHA_MIN: 0.0
     ALPHA_MAX: 1.0
+    SCHEDULER: exp  #linear, exp
   ADD_BG2:
     ENABLE: False
     START_FROM_EPOCH: 0
