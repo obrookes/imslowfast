@@ -340,6 +340,8 @@ _C.TEST.NUM_TEMPORAL_CLIPS = []
 
 _C.TEST.RETURN_FEATS = False
 
+_C.TEST.RETURN_CONV3D = False
+
 _C.TEST.RETURN_CAS = False
 # -----------------------------------------------------------------------------
 # ResNet options

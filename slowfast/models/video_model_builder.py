@@ -955,6 +955,7 @@ class ManifoldMixupResNet(nn.Module):
             self.class_proportions = self.calculate_class_proportions(class_frequencies)
         else:
             self.class_proportions = None
+        self.conv3d = cfg.TEST.RETURN_CONV3D
         self._construct_network(cfg)
 
         init_helper.init_weights(
@@ -1095,7 +1096,8 @@ class ManifoldMixupResNet(nn.Module):
             norm_module=self.norm_module,
         )
 
-        self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        # self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
         self.head = head_helper.ResNetBasicHead(
             dim_in=[width_per_group * 32],
@@ -1203,6 +1205,7 @@ class ManifoldMixupResNet(nn.Module):
         x = self.s3(y)
         x = self.s4(x)
         x = self.s5(x)
+        conv3d = x
         x = torch.cat(x, 1)
         # average pool
         x = self.avg_pool(x)
@@ -1227,7 +1230,10 @@ class ManifoldMixupResNet(nn.Module):
                 return x, y_a, y_b, lam
         else:
             if self.return_feats:
-                feats = x
+                if self.conv3d:
+                    feats = conv3d
+                else:
+                    feats = x
                 x = self.projection(x)
                 return (x, feats)
             else:
