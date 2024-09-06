@@ -737,11 +737,20 @@ def train(cfg):
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
 
-    alpha_scheduler = torch.linspace(
-        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
-        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
-        cfg.SOLVER.MAX_EPOCH,
-    )
+    #
+    if cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "exp":
+        alpha_scheduler = torch.logspace(
+            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+            cfg.SOLVER.MAX_EPOCH,
+            base=torch.e,
+        )
+    elif cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "linear":
+        alpha_scheduler = torch.linspace(
+            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+            cfg.SOLVER.MAX_EPOCH,
+        )
 
     # Init multigrid.
     multigrid = None
