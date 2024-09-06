@@ -226,7 +226,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                 test_meter,
                 all_names,
                 all_preds,
-                torch.stack(all_feats, dim=0),
+                torch.cat(all_feats, dim=0),
                 all_labels,
             )
         else:
