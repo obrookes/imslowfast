@@ -714,6 +714,11 @@ class TrainMeter:
                 torch.cat(self.all_preds).cpu().numpy(),
                 torch.cat(self.all_labels).cpu().numpy(),
             )
+
+            if self._cfg.FRAMEWISE_MIXUP.ENABLE:
+                if self._cfg.FRAMEWISE_MIXUP.INDEPENDENT_FRAME_MIX:
+                    preds = preds.mean(axis=1)
+
             macro_map = average_precision_score(labels, preds, average="macro")
             micro_map = average_precision_score(labels, preds, average="micro")
             aps = average_precision_score(labels, preds, average=None)

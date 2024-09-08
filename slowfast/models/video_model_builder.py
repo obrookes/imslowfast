@@ -1236,6 +1236,309 @@ class ManifoldMixupResNet(nn.Module):
 
 
 @MODEL_REGISTRY.register()
+class ResNetFramewiseMixup(nn.Module):
+    """
+    ResNet model builder. It builds a ResNet like network backbone without
+    lateral connection (C2D, I3D, Slow).
+
+    Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
+    "SlowFast networks for video recognition."
+    https://arxiv.org/pdf/1812.03982.pdf
+
+    Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
+    "Non-local neural networks."
+    https://arxiv.org/pdf/1711.07971.pdf
+    """
+
+    def __init__(self, cfg):
+        """
+        The `__init__` method of any subclass should also contain these
+            arguments.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        super(ResNetFramewiseMixup, self).__init__()
+        self.norm_module = get_norm(cfg)
+        self.enable_detection = cfg.DETECTION.ENABLE
+        self.num_pathways = 1
+        self.independent_frame_mix = cfg.FRAMEWISE_MIXUP.INDEPENDENT_FRAME_MIX
+        self.randomise_frame_mix = cfg.FRAMEWISE_MIXUP.RANDOMISE_FRAME_MIX
+        self._construct_network(cfg)
+        init_helper.init_weights(
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
+        )
+
+    def _construct_network(self, cfg):
+        """
+        Builds a single pathway ResNet model.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        assert cfg.MODEL.ARCH in _POOL1.keys()
+        pool_size = _POOL1[cfg.MODEL.ARCH]
+        assert len({len(pool_size), self.num_pathways}) == 1
+        assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
+
+        (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
+
+        num_groups = cfg.RESNET.NUM_GROUPS
+        width_per_group = cfg.RESNET.WIDTH_PER_GROUP
+        dim_inner = num_groups * width_per_group
+
+        temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
+
+        s1 = stem_helper.VideoModelStem(
+            dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
+            dim_out=[width_per_group],
+            kernel=[temp_kernel[0][0] + [7, 7]],
+            stride=[[1, 2, 2]],
+            padding=[[temp_kernel[0][0][0] // 2, 3, 3]],
+            norm_module=self.norm_module,
+        )
+
+        s2 = resnet_helper.ResStage(
+            dim_in=[width_per_group],
+            dim_out=[width_per_group * 4],
+            dim_inner=[dim_inner],
+            temp_kernel_sizes=temp_kernel[1],
+            stride=cfg.RESNET.SPATIAL_STRIDES[0],
+            num_blocks=[d2],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[0],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[0],
+            nonlocal_group=cfg.NONLOCAL.GROUP[0],
+            nonlocal_pool=cfg.NONLOCAL.POOL[0],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
+        )
+
+        # Based on profiling data of activation size, s1 and s2 have the activation sizes
+        # that are 4X larger than the second largest. Therefore, checkpointing them gives
+        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
+        # with recomputing FLOPs.
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+            self.s1 = checkpoint_wrapper(s1)
+            self.s2 = checkpoint_wrapper(s2)
+        else:
+            self.s1 = s1
+            self.s2 = s2
+
+        for pathway in range(self.num_pathways):
+            pool = nn.MaxPool3d(
+                kernel_size=pool_size[pathway],
+                stride=pool_size[pathway],
+                padding=[0, 0, 0],
+            )
+            self.add_module("pathway{}_pool".format(pathway), pool)
+
+        self.s3 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 4],
+            dim_out=[width_per_group * 8],
+            dim_inner=[dim_inner * 2],
+            temp_kernel_sizes=temp_kernel[2],
+            stride=cfg.RESNET.SPATIAL_STRIDES[1],
+            num_blocks=[d3],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[1],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[1],
+            nonlocal_group=cfg.NONLOCAL.GROUP[1],
+            nonlocal_pool=cfg.NONLOCAL.POOL[1],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
+        )
+
+        self.s4 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 8],
+            dim_out=[width_per_group * 16],
+            dim_inner=[dim_inner * 4],
+            temp_kernel_sizes=temp_kernel[3],
+            stride=cfg.RESNET.SPATIAL_STRIDES[2],
+            num_blocks=[d4],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[2],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[2],
+            nonlocal_group=cfg.NONLOCAL.GROUP[2],
+            nonlocal_pool=cfg.NONLOCAL.POOL[2],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
+        )
+
+        self.s5 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 16],
+            dim_out=[width_per_group * 32],
+            dim_inner=[dim_inner * 8],
+            temp_kernel_sizes=temp_kernel[4],
+            stride=cfg.RESNET.SPATIAL_STRIDES[3],
+            num_blocks=[d5],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[3],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[3],
+            nonlocal_group=cfg.NONLOCAL.GROUP[3],
+            nonlocal_pool=cfg.NONLOCAL.POOL[3],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
+        )
+
+        self.avg_pool_3d = nn.AdaptiveAvgPool3d((1, 1, 1))
+        self.avg_pool_2d = nn.AdaptiveAvgPool2d((1, 2048))
+
+        self.head = head_helper.ResNetBasicHead(
+            dim_in=[width_per_group * 32],
+            num_classes=cfg.MODEL.NUM_CLASSES,
+            pool_size=(
+                [None]
+                if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                else [
+                    [
+                        cfg.DATA.NUM_FRAMES // pool_size[0][0],
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                    ]
+                ]
+            ),  # None for AdaptiveAvgPool3d((1, 1, 1))
+            dropout_rate=cfg.MODEL.DROPOUT_RATE,
+            act_func=cfg.MODEL.HEAD_ACT,
+            detach_head=cfg.MODEL.DETACH_HEAD,
+            detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+            cfg=cfg,
+        )
+
+        self.projection = self.head.projection
+
+    def forward(self, x, bbox=None):
+        x = x[:]  # avoid pass by reference
+        x = self.s1(x)
+        x = self.s2(x)
+        y = []  # Don't modify x list in place due to activation checkpoint.
+        for pathway in range(self.num_pathways):
+            pool = getattr(self, "pathway{}_pool".format(pathway))
+            y.append(pool(x[pathway]))
+        x = self.s3(y)
+        x = self.s4(x)
+        x = self.s5(x)  # [B, C, T, H, W]
+
+        if self.training:
+            # Extract framewise features
+            x = self.extract_framewise_features(
+                x, x[0].shape[2]  # [B, C, T]
+            )  # TODO: Check this is correct dim
+
+            x, lam, index = self.framewise_mixup(
+                x,
+                alpha=1,  # TODO: Make this config option
+                use_cuda=True if torch.cuda.is_available() else False,
+                independent_frame_mix=self.independent_frame_mix,
+                randomize_frames=self.randomise_frame_mix,
+            )
+            if self.independent_frame_mix:
+                x = self.projection(x)
+                return x, lam, index
+            else:
+                x = self.avg_pool_2d(x).squeeze(dim=1)
+                x = self.projection(x)
+                return x, lam, index
+        else:
+            x = torch.cat(x, 1)
+            x = self.avg_pool_3d(x)
+            x = torch.flatten(x, 1)
+            x = self.projection(x)
+            return x
+
+    def extract_framewise_features(self, feature_map, t):
+        spatially_pooled = F.adaptive_avg_pool3d(feature_map[0], (t, 1, 1))
+        framewise_features = torch.flatten(spatially_pooled, start_dim=2)
+        return framewise_features.permute(0, 2, 1)
+
+    def framewise_mixup(
+        self,
+        x,
+        alpha=1.0,
+        use_cuda=False,
+        independent_frame_mix=False,
+        randomize_frames=False,
+    ):
+        """
+        Returns mixed inputs, pairs of targets, and lambda for tensors of shape (B, T, D)
+        B: batch size, T: time steps, D: feature dimension
+
+        Parameters:
+        - x: input tensor of shape (B, T, D)
+        - y: target tensor
+        - alpha: parameter for Beta distribution
+        - use_cuda: whether to use CUDA for computations
+        - independent_frame_mix: if True, use independent lambda for each frame
+        - randomize_frames: if True, randomize the temporal order of frames when mixing
+        """
+        batch_size, time_steps, _ = x.size()
+
+        if alpha > 0:
+            if independent_frame_mix:
+                lam = torch.distributions.beta.Beta(alpha, alpha).sample(
+                    (batch_size, time_steps, 1)
+                )
+            else:
+                lam = torch.distributions.beta.Beta(alpha, alpha).sample(
+                    (batch_size, 1, 1)
+                )
+        else:
+            lam = torch.ones(
+                (batch_size, time_steps if independent_frame_mix else 1, 1)
+            )
+
+        lam = lam.to(x.device)
+
+        if use_cuda:
+            index = torch.randperm(batch_size).cuda()
+        else:
+            index = torch.randperm(batch_size)
+
+        x_permuted = x[index]
+
+        if randomize_frames:
+            # Generate random permutation for each sample in the batch
+            frame_permutation = torch.stack(
+                [torch.randperm(time_steps) for _ in range(batch_size)]
+            )
+            frame_permutation = frame_permutation.to(x.device)
+
+            # Apply the permutation to each sample
+            x_permuted = torch.stack(
+                [x_permuted[i, frame_permutation[i]] for i in range(batch_size)]
+            )
+
+        # Perform frame-wise interpolation
+        mixed_x = lam * x + (1 - lam) * x_permuted
+
+        return mixed_x, lam, index
+
+
+@MODEL_REGISTRY.register()
 class ResNetFGBGMixup(nn.Module):
     """
     ResNet model builder. It builds a ResNet like network backbone without
