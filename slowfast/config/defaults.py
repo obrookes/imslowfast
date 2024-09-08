@@ -89,6 +89,19 @@ _C.CONTRASTIVE.SWAV_QEUE_LEN = 0
 # Wether to run online kNN evaluation during training
 _C.CONTRASTIVE.KNN_ON = True
 
+
+# ---------------------------------------------------------------------------- #
+# Framewise mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FRAMEWISE_MIXUP = CfgNode()
+
+_C.FRAMEWISE_MIXUP.ENABLE = False
+
+_C.FRAMEWISE_MIXUP.INDEPENDENT_FRAME_MIX = False
+
+_C.FRAMEWISE_MIXUP.RANDOMISE_FRAME_MIX = False
+
 # ---------------------------------------------------------------------------- #
 # Temporal action proposal options
 # ---------------------------------------------------------------------------- #
