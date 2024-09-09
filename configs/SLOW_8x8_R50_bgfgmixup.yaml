@@ -96,6 +96,7 @@ MODEL:
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
+  FEAT_AGGREGATOR: conv # conv, max_pool, avg_pool
 
 DATA_LOADER:
   NUM_WORKERS: 4
