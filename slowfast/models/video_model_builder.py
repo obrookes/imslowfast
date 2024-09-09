@@ -1446,7 +1446,8 @@ class ResNetFramewiseMixup(nn.Module):
         if self.training:
             # Extract framewise features
             x = self.extract_framewise_features(
-                x, x[0].shape[2]  # [B, C, T]
+                x,
+                x[0].shape[2],  # [B, C, T]
             )  # TODO: Check this is correct dim
 
             x, lam, index = self.framewise_mixup(
@@ -1713,7 +1714,17 @@ class ResNetFGBGMixup(nn.Module):
         )
 
         # self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
-        self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
+        if cfg.MODEL.FEAT_AGGREGATOR == "avg_pool":
+            self.feat_agg = nn.AdaptiveAvgPool3d((1, 1, 1))
+        elif cfg.MODEL.FEAT_AGGREGATOR == "max_pool":
+            self.feat_agg = nn.AdaptiveMaxPool3d((1, 1, 1))
+        elif cfg.MODEL.FEAT_AGGREGATOR == "conv":
+            self.feat_agg = operators.SeparableConv3d(
+                kernel_size=(16, 8, 8),
+                stride=(1, 1, 1),
+                in_channels=2048,
+                out_channels=2048,
+            )
 
         if self.enable_detection:
             self.head = head_helper.ResNetRoIHead(
@@ -1763,9 +1774,7 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = (
-                                []
-                            )  # Don't modify x list in place due to activation checkpoint.
+                            y = []  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -1773,7 +1782,7 @@ class ResNetFGBGMixup(nn.Module):
                             x = self.s4(x)
                             x = self.s5(x)
                             x = torch.cat(x, 1)
-                            x = self.avg_pool(x)
+                            x = self.feat_agg(x)
                             x = torch.flatten(x, 1)
                             emb_dict[k] = x
                     else:
@@ -1788,7 +1797,7 @@ class ResNetFGBGMixup(nn.Module):
                         x = self.s4(x)
                         x = self.s5(x)
                         x = torch.cat(x, 1)
-                        x = self.avg_pool(x)
+                        x = self.feat_agg(x)
                         x = torch.flatten(x, 1)
                         emb_dict[k] = x
                 else:
@@ -1803,7 +1812,7 @@ class ResNetFGBGMixup(nn.Module):
                     x = self.s4(x)
                     x = self.s5(x)
                     x = torch.cat(x, 1)
-                    x = self.avg_pool(x)
+                    x = self.feat_agg(x)
                     x = torch.flatten(x, 1)
                     emb_dict[k] = x
 

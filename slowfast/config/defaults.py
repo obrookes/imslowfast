@@ -500,6 +500,8 @@ _C.MODEL.FROZEN_BN = False
 # If True, AllReduce gradients are compressed to fp16
 _C.MODEL.FP16_ALLREDUCE = False
 
+_C.MODEL.FEAT_AGGREGATOR = "avg_pool"
+
 
 # -----------------------------------------------------------------------------
 # MViT options
