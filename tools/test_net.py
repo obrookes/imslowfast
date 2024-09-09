@@ -221,7 +221,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
         elif cfg.FG_BG_MIXUP.ENABLE:
             return test_meter, all_names, all_preds, all_labels
         elif cfg.TEST.RETURN_CONV3D:
-            all_feats = [feat[0] for feat in all_feats]
+            all_feats = [feat[0].unsqueeze(0) for feat in all_feats]
             all_feats = [feat[0].detach().cpu() for feat in all_feats]
             return (
                 test_meter,
