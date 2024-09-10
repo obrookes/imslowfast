@@ -29,8 +29,12 @@ DATA:
 
 FG_BG_MIXUP:
   ENABLE: True
-  SUBTRACT_BG: 
+  ADD_BG: 
     ENABLE: True
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+  SUBTRACT_BG: 
+    ENABLE: False
     ALPHA_MIN: 0.0
     ALPHA_MAX: 1.0
     SCHEDULER: exp  #linear, exp

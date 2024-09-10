@@ -1571,8 +1571,9 @@ class ResNetFGBGMixup(nn.Module):
         self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
         self.mix_on_eval = cfg.FG_BG_MIXUP.MIX_ON_EVAL
         self.subract_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
-        self.subract_bg_alpha_max = cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX
+        self.add_bg = cfg.FG_BG_MIXUP.ADD_BG.ENABLE
         self.add_bg2 = cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1829,7 +1830,6 @@ class ResNetFGBGMixup(nn.Module):
                 beta,
             )
         elif (not self.training) and (self.mix_on_eval):
-            # alpha = 0.0 if self.subract_bg_alpha_max == 0.0 else 1.0
             # beta must be None so we don't add bg2 embeddings during evaluation
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"],
@@ -1892,6 +1892,10 @@ class ResNetFGBGMixup(nn.Module):
                 else:
                     # Subtract background embeddings
                     processed_embeddings[i] = fg_embs[i] - bg_embs[i]
+            elif self.add_bg and self.subract_bg is False:
+                # Add background embeddings with alpha
+                background_added = fg_embs[i] + bg_embs[i] * (1 - alpha)
+                processed_embeddings[i] = background_added
 
         return processed_embeddings
 

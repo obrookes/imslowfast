@@ -232,14 +232,21 @@ def train_epoch(
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds, y_a, y_b, lam = model(inputs, labels)
             elif cfg.FG_BG_MIXUP.ENABLE:
-                if (
-                    cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
-                    and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                    if (
+                        cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                        and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                    ):
+                        beta = 1 - alpha
+                        preds = model(inputs, alpha, beta)
+                    else:
+                        preds = model(inputs, alpha)
+                elif (
+                    cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                    and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
                 ):
-                    beta = 1 - alpha
-                    preds = model(inputs, alpha, beta)
-                else:
                     preds = model(inputs, alpha)
+
             elif cfg.FRAMEWISE_MIXUP.ENABLE:
                 preds, lam, index = model(inputs)
             else:
@@ -757,20 +764,27 @@ def train(cfg):
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
 
-    #
-    if cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "exp":
-        alpha_scheduler = torch.logspace(
-            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
-            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
-            cfg.SOLVER.MAX_EPOCH,
-            base=torch.e,
-        )
-    elif cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "linear":
-        alpha_scheduler = torch.linspace(
-            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
-            cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
-            cfg.SOLVER.MAX_EPOCH,
-        )
+    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is True:
+        if cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "exp":
+            alpha_scheduler = torch.logspace(
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                cfg.SOLVER.MAX_EPOCH,
+                base=torch.e,
+            )
+        elif cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "linear":
+            alpha_scheduler = torch.linspace(
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                cfg.SOLVER.MAX_EPOCH,
+            )
+    elif cfg.FG_BG_MIXUP.ADD_BG.ENABLE is True:
+        if cfg.FG_BG_MIXUP.ADD_BG.SCHEDULER == "linear":
+            alpha_scheduler = torch.linspace(
+                cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MIN,
+                cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MAX,
+                cfg.SOLVER.MAX_EPOCH,
+            )
 
     # Init multigrid.
     multigrid = None
