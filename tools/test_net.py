@@ -131,17 +131,29 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                 # Perform the forward pass.
                 preds, feats, cas = model(inputs)
             elif cfg.FG_BG_MIXUP.ENABLE:
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                    alpha_scheduler = torch.linspace(
+                        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+                        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                        cfg.SOLVER.MAX_EPOCH,
+                    )
+                    alpha = alpha_scheduler[epoch]
+                    if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE:
+                        beta = 1 - alpha
+                        preds = model(inputs, alpha, beta)
+                    else:
+                        preds = model(inputs, alpha)
+            elif (
+                cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+            ):
                 alpha_scheduler = torch.linspace(
-                    cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
-                    cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                    cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MIN,
+                    cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MAX,
                     cfg.SOLVER.MAX_EPOCH,
                 )
-                alpha = alpha_scheduler[epoch]
-                if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE:
-                    beta = 1 - alpha
-                    preds = model(inputs, alpha, beta)
-                else:
-                    preds = model(inputs, alpha)
+                preds = model(inputs, alpha_scheduler[epoch])
+
             else:
                 out = model(inputs)
         else:
@@ -380,8 +392,7 @@ def test(cfg):
         result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
 
         result_string = (
-            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
-            "".format(
+            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}" "".format(
                 params / 1e6,
                 flops,
                 view,
