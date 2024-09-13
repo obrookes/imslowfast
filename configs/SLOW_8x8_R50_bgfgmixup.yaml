@@ -1,7 +1,7 @@
 TRAIN:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 10
+  BATCH_SIZE: 16
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 100
   CHECKPOINT_FILE_PATH: projects/slow/SLOWONLY_8x8_R50.pkl
@@ -11,7 +11,7 @@ TRAIN:
 TEST:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 10
+  BATCH_SIZE: 16
   NUM_ENSEMBLE_VIEWS: 1
   NUM_SPATIAL_CROPS: 1
 DATA:
@@ -30,13 +30,14 @@ DATA:
 FG_BG_MIXUP:
   ENABLE: True
   ADD_BG: 
-    ENABLE: True
-    ALPHA_MIN: 0.0
-    ALPHA_MAX: 1.0
-  SUBTRACT_BG: 
     ENABLE: False
     ALPHA_MIN: 0.0
     ALPHA_MAX: 1.0
+  SUBTRACT_BG: 
+    ENABLE: True
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+    ORTHO_EMBS: True
     SCHEDULER: exp  #linear, exp
   ADD_BG2:
     ENABLE: False
@@ -100,12 +101,12 @@ MODEL:
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
-  FEAT_AGGREGATOR: conv # conv, max_pool, avg_pool
+  FEAT_AGGREGATOR: avg_pool # conv, max_pool, avg_pool
 
 DATA_LOADER:
   NUM_WORKERS: 4
   PIN_MEMORY: True
-NUM_GPUS: 1
+NUM_GPUS: 2
 NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0

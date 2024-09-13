@@ -240,7 +240,10 @@ def train_epoch(
                         beta = 1 - alpha
                         preds = model(inputs, alpha, beta)
                     else:
-                        preds = model(inputs, alpha)
+                        if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                            preds, loss_ortho = model(inputs, alpha)
+                        else:
+                            preds = model(inputs, alpha)
                 elif (
                     cfg.FG_BG_MIXUP.ADD_BG.ENABLE
                     and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
@@ -299,7 +302,10 @@ def train_epoch(
                     loss = loss.mean()
             else:
                 # Compute the loss.
-                loss = loss_fun(preds, labels)
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS and loss_ortho is not None:
+                    loss = loss_fun(preds, labels) + loss_ortho
+                else:
+                    loss = loss_fun(preds, labels)
 
         loss_extra = None
         if isinstance(loss, (list, tuple)):
@@ -604,7 +610,10 @@ def eval_epoch(
                     beta = 1 - alpha
                     preds = model(inputs, alpha, beta)
                 else:
-                    preds = model(inputs, alpha)
+                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                        preds, _ = model(inputs, alpha)
+                    else:
+                        preds = model(inputs, alpha)
             elif cfg.FRAMEWISE_MIXUP.ENABLE:
                 preds = model(inputs)
             else:
@@ -766,12 +775,8 @@ def train(cfg):
 
     if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is True:
         if cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "exp":
-            alpha_scheduler = torch.logspace(
-                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
-                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
-                cfg.SOLVER.MAX_EPOCH,
-                base=torch.e,
-            )
+            alpha_scheduler = torch.logspace(-10, 0, cfg.SOLVER.MAX_EPOCH, base=torch.e)
+
         elif cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "linear":
             alpha_scheduler = torch.linspace(
                 cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,

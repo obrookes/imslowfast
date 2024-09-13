@@ -1571,6 +1571,7 @@ class ResNetFGBGMixup(nn.Module):
         self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
         self.mix_on_eval = cfg.FG_BG_MIXUP.MIX_ON_EVAL
         self.subract_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
+        self.ortho_embs = cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS
         self.add_bg = cfg.FG_BG_MIXUP.ADD_BG.ENABLE
         self.add_bg2 = cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
 
@@ -1819,6 +1820,13 @@ class ResNetFGBGMixup(nn.Module):
 
         mask = mask.clone().detach().bool()
 
+        if self.ortho_embs:
+            # Orthogonalise the embeddings
+            emb_dict["fg_frames"] = F.normalize(emb_dict["fg_frames"])
+            emb_dict["bg_frames"] = F.normalize(emb_dict["bg_frames"])
+            loss_ortho = torch.sum(emb_dict["fg_frames"] * emb_dict["bg_frames"], dim=1)
+            loss_ortho = torch.mean(loss_ortho)
+
         if self.training and self.fg_bg_mixup_enable:
             # Mix embeddings based on the batch
             embs = self.mix_fg_bg(
@@ -1844,6 +1852,10 @@ class ResNetFGBGMixup(nn.Module):
 
         # Project to N dim
         x = self.projection(embs)
+
+        if self.ortho_embs:
+            return x, loss_ortho
+
         return x
 
     def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, alpha, beta=None):
