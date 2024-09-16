@@ -111,7 +111,7 @@ class AssumeNegativeLabelSmoothingLoss(nn.Module):
 
 
 class WeakAssumeNegativeLoss(nn.Module):
-    def __init__(self, gamma=0.07692307692307693, epsilon=1e-7, reduction="mean"):
+    def __init__(self, gamma=1.0, epsilon=1e-7, reduction="mean"):
         super(WeakAssumeNegativeLoss, self).__init__()
         self.gamma = gamma
         self.epsilon = epsilon
@@ -139,17 +139,11 @@ class WeakAssumeNegativeLoss(nn.Module):
         pos_loss = targets * torch.log(probabilities)
         neg_loss = (1 - targets) * torch.log(1 - probabilities)
 
-        # Get the number of classes (L)
-        num_classes = probabilities.size(1)
-
         # Apply weighting to negative loss
         neg_loss = self.gamma * neg_loss
 
         # Combine positive and negative losses
         loss_per_sample = -(pos_loss + neg_loss)
-
-        # Average over classes (this implements the 1/L normalization)
-        loss_per_sample = loss_per_sample.sum(dim=1) / num_classes
 
         # Apply reduction
         if self.reduction == "mean":
