@@ -1570,7 +1570,13 @@ class ResNetFGBGMixup(nn.Module):
         self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
         self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
         self.mix_on_eval = cfg.FG_BG_MIXUP.MIX_ON_EVAL
-        self.subract_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
+        self.sub_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
+        self.sub_bg_apply_classwise = cfg.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.ENABLE
+        self.sub_bg_apply_classwise_classes = (
+            cfg.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.CLASSES
+        )
+
+        self.sub_bg_alpha_max = cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX
         self.ortho_embs = cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS
         self.add_bg = cfg.FG_BG_MIXUP.ADD_BG.ENABLE
         self.add_bg2 = cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
@@ -1765,9 +1771,10 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x, alpha=0.0, beta=None):
+    def forward(self, x, alpha=0.0, beta=None, labels=None):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
+
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
                 if (k == "bg_frames") or (k == "bg2_frames"):
@@ -1820,45 +1827,66 @@ class ResNetFGBGMixup(nn.Module):
 
         mask = mask.clone().detach().bool()
 
-        if self.ortho_embs:
-            # Orthogonalise the embeddings
-            emb_dict["fg_frames"] = F.normalize(emb_dict["fg_frames"])
-            emb_dict["bg_frames"] = F.normalize(emb_dict["bg_frames"])
-            loss_ortho = torch.sum(emb_dict["fg_frames"] * emb_dict["bg_frames"], dim=1)
-            loss_ortho = torch.mean(loss_ortho)
+        if (
+            labels is not None
+            and self.sub_bg_apply_classwise
+            and self.sub_bg_apply_classwise_classes
+        ):
+            # Convert allowed classes to a set for faster lookup
+            allowed_labels = set(self.sub_bg_apply_classwise_classes)
 
-        if self.training and self.fg_bg_mixup_enable:
-            # Mix embeddings based on the batch
-            embs = self.mix_fg_bg(
-                emb_dict["fg_frames"],
-                emb_dict["bg_frames"],
-                emb_dict["bg2_frames"],
-                mask,
-                alpha,
-                beta,
-            )
-        elif (not self.training) and (self.mix_on_eval):
-            # beta must be None so we don't add bg2 embeddings during evaluation
-            embs = self.mix_fg_bg(
-                emb_dict["fg_frames"],
-                emb_dict["bg_frames"],
-                emb_dict["bg2_frames"],
-                mask,
-                alpha,
-                beta,
-            )
+            # Convert labels to categorical labels by extracting indices of non-zero elements
+            categorical_labels = [
+                torch.nonzero(row, as_tuple=True)[0].tolist() for row in labels
+            ]
+
+            # List to hold indices of samples with not allowed labels
+            affected_sample_indices = []
+
+            # Iterate over each sample's categorical labels
+            for idx, cat_labels in enumerate(categorical_labels):
+                # Check if any label is not in allowed_labels
+                if not all(label in allowed_labels for label in cat_labels):
+                    affected_sample_indices.append(idx)
+
+            # Update the mask to not apply background subtraction for these samples
+            for i in affected_sample_indices:
+                mask[i] = True
+
+        loss_ortho = None
+
+        if (self.training and self.fg_bg_mixup_enable) or (
+            (not self.training) and (self.mix_on_eval)
+        ):
+            if self.ortho_embs:
+                embs, loss_ortho = self.mix_fg_bg(
+                    emb_dict["fg_frames"],
+                    emb_dict["bg_frames"],
+                    emb_dict["bg2_frames"],
+                    mask,
+                    alpha,
+                    beta,
+                )
+                # Project to N dim
+                x = self.projection(embs)
+                return x, loss_ortho
+
+            else:
+                # Mix embeddings based on the batch
+                embs = self.mix_fg_bg(
+                    emb_dict["fg_frames"],
+                    emb_dict["bg_frames"],
+                    emb_dict["bg2_frames"],
+                    mask,
+                    alpha,
+                    beta,
+                )
         else:
             embs = emb_dict["fg_frames"]
-
-        # Project to N dim
         x = self.projection(embs)
-
-        if self.ortho_embs:
-            return x, loss_ortho
-
         return x
 
-    def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, alpha, beta=None):
+    def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, alpha=None, beta=None):
         """
         Process video embeddings based on the given criteria and UTM locations using PyTorch.
 
@@ -1880,36 +1908,75 @@ class ResNetFGBGMixup(nn.Module):
         # Create a boolean mask for positive foregrounds
         positive_mask = ~mask
 
+        bg_embs_list = []
+        bg_sub_embs_list = []
+        bg2_embs_list = []
+
         positive_indices = torch.where(positive_mask)[0]
         for i in positive_indices:
-            if self.subract_bg:
+            if self.sub_bg:
                 if alpha > 0.0:
                     # Subtract background embeddings with alpha
-                    background_subtracted = fg_embs[i] - bg_embs[i] * (1 - alpha)
-
-                    if self.add_bg2:
-                        # Add background to subtracted embeddings with beta mixup
-                        if beta is not None:
-                            processed_embeddings[i] = (
-                                background_subtracted + bg2_embs[i] * beta
-                            )
-                        else:
-                            # Add background to subtracted embeddings with complete mixup
-                            processed_embeddings[i] = (
-                                background_subtracted + bg2_embs[i]
-                            )
-                    else:
-                        processed_embeddings[i] = background_subtracted
-
+                    bg_emb = bg_embs[i] * (1 - alpha)
                 else:
                     # Subtract background embeddings
-                    processed_embeddings[i] = fg_embs[i] - bg_embs[i]
+                    bg_emb = bg_embs[i]
+
+                fg_emb = fg_embs[i]
+                bg_sub_emb = fg_emb - bg_emb
+
+                if self.add_bg2:
+                    bg2_emb = bg2_embs[i]
+                    # Add background to subtracted embeddings with beta mixup
+                    if beta:
+                        bg2_emb = bg2_emb * beta
+
+                    processed_embeddings[i] = bg_sub_emb + bg2_emb
+                    bg2_embs_list.append(bg2_emb)
+                else:
+                    processed_embeddings[i] = bg_sub_emb
+
+                # Append the background embeddings for orthogonalisation
+                bg_embs_list.append(bg_emb)
+                bg_sub_embs_list.append(bg_sub_emb)
+
             elif self.add_bg and self.subract_bg is False:
                 # Add background embeddings with alpha
-                background_added = fg_embs[i] + bg_embs[i] * (1 - alpha)
-                processed_embeddings[i] = background_added
+                bg_added_emb = fg_emb + bg_emb * (1 - alpha)
+                processed_embeddings[i] = bg_added_emb
+
+        if self.ortho_embs:
+            loss_ortho = 0.0
+            # Orthogonalise the embeddings
+            bg_embs = torch.stack(bg_embs_list)
+            bg_sub_embs = torch.stack(bg_sub_embs_list)
+
+            if self.sub_bg:
+                loss_ortho += self.ortho_loss(bg_embs, bg_sub_embs)
+            if self.add_bg2 and beta:
+                bg2_embs = torch.stack(bg2_embs_list)
+                loss_ortho += self.ortho_loss(bg_sub_embs, bg2_embs)
+
+            return processed_embeddings, loss_ortho
 
         return processed_embeddings
+
+    def ortho_loss(self, emb1, emb2):
+        """
+        Calculate the orthogonalisation loss between two sets of embeddings.
+
+        Args:
+            emb1 (torch.Tensor): Embeddings to orthogonalise
+            emb2 (torch.Tensor): Embeddings to orthogonalise against
+
+        Returns:
+            loss (torch.Tensor): Orthogonalisation loss
+        """
+        emb1 = F.normalize(emb1)
+        emb2 = F.normalize(emb2)
+        loss = torch.sum(emb1 * emb2, dim=1)
+        loss = torch.mean(loss)
+        return torch.abs(loss)
 
 
 @MODEL_REGISTRY.register()

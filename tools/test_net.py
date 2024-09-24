@@ -156,8 +156,6 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
 
             else:
                 out = model(inputs)
-        elif cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
-            preds, _ = model(inputs)
         else:
             # Perform the forward pass.
             preds = model(inputs)

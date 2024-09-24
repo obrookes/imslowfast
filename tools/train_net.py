@@ -232,23 +232,50 @@ def train_epoch(
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds, y_a, y_b, lam = model(inputs, labels)
             elif cfg.FG_BG_MIXUP.ENABLE:
-                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
-                    if (
-                        cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
-                        and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
-                    ):
-                        beta = 1 - alpha
-                        preds = model(inputs, alpha, beta)
-                    else:
-                        if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
-                            preds, loss_ortho = model(inputs, alpha)
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.ENABLE:
+                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                        if (
+                            cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                            and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                        ):
+                            beta = 1 - alpha
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(
+                                    inputs, alpha, beta, labels=labels
+                                )
+                            else:
+                                preds = model(inputs, alpha, beta, labels=labels)
                         else:
-                            preds = model(inputs, alpha)
-                elif (
-                    cfg.FG_BG_MIXUP.ADD_BG.ENABLE
-                    and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
-                ):
-                    preds = model(inputs, alpha)
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha, labels=labels)
+                            else:
+                                preds = model(inputs, alpha, labels=labels)
+                    elif (
+                        cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                        and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+                    ):
+                        preds = model(inputs, alpha, labels=labels)
+                else:
+                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                        if (
+                            cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                            and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                        ):
+                            beta = 1 - alpha
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha, beta)
+                            else:
+                                preds = model(inputs, alpha, beta)
+                        else:
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha)
+                            else:
+                                preds = model(inputs, alpha)
+                    elif (
+                        cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                        and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+                    ):
+                        preds = model(inputs, alpha)
 
             elif cfg.FRAMEWISE_MIXUP.ENABLE:
                 preds, lam, index = model(inputs)
@@ -302,7 +329,8 @@ def train_epoch(
                     loss = loss.mean()
             else:
                 # Compute the loss.
-                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS and loss_ortho is not None:
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                    assert len(preds) == len(labels)
                     loss = loss_fun(preds, labels) + loss_ortho
                 else:
                     loss = loss_fun(preds, labels)
@@ -603,17 +631,13 @@ def eval_epoch(
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds = model(inputs, labels)
             elif cfg.FG_BG_MIXUP.ENABLE:
-                if (
-                    cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
-                    and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE and cur_epoch >= (
+                    cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
                 ):
                     beta = 1 - alpha
                     preds = model(inputs, alpha, beta)
                 else:
-                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
-                        preds, _ = model(inputs, alpha)
-                    else:
-                        preds = model(inputs, alpha)
+                    preds = model(inputs, alpha)
             elif cfg.FRAMEWISE_MIXUP.ENABLE:
                 preds = model(inputs)
             else:
