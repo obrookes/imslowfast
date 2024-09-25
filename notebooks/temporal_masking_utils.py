@@ -8,20 +8,34 @@ from torchmetrics.functional.classification import (
 )
 
 
-def get_feature_map(model, sample):
+def get_feature_map(model, sample, layer="s5"):
     # Get device
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Move model and data to device
     sample = sample.to(device)
     model = model.to(device)
-
-    with torch.no_grad():
-        feature_map = model.s5(
-            model.s4(model.s3(model.s2(model.s1([sample.unsqueeze(0)]))))
-        )[
-            0
-        ]  # TODO: Investigate features at earlier layers
+    if layer == "s1":
+        with torch.no_grad():
+            feature_map = model.s1([sample.unsqueeze(0)])[0]
+    elif layer == "s2":
+        with torch.no_grad():
+            feature_map = model.s2(model.s1([sample.unsqueeze(0)]))[0]
+    elif layer == "s3":
+        with torch.no_grad():
+            feature_map = model.s3(model.s2(model.s1([sample.unsqueeze(0)])))[0]
+    elif layer == "s4":
+        with torch.no_grad():
+            feature_map = model.s4(model.s3(model.s2(model.s1([sample.unsqueeze(0)]))))[
+                0
+            ]
+    elif layer == "s5":
+        with torch.no_grad():
+            feature_map = model.s5(
+                model.s4(model.s3(model.s2(model.s1([sample.unsqueeze(0)]))))
+            )[
+                0
+            ]  # TODO: Investigate features at earlier layers
     return feature_map
 
 
