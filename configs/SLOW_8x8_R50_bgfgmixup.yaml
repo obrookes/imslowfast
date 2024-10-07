@@ -22,8 +22,8 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/fgbgmixup
-  PATH_PREFIX: /home/kukushkin/imslowfast/dataset/videos/
+  PATH_TO_DATA_DIR: dataset/annotations/fgbgmixup
+  PATH_PREFIX: dataset/videos/
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
   # DECODING_BACKEND: pyav #torchvision or pyav
@@ -53,14 +53,14 @@ FG_BG_MIXUP:
 
 TENSORBOARD:
   ENABLE: False
-  CLASS_NAMES_PATH: /home/kukushkin/imslowfast/dataset/metadata/behaviours.json
+  CLASS_NAMES_PATH: dataset/metadata/behaviours.json
   CONFUSION_MATRIX:
     ENABLE: True
-    SUBSET_PATH: /home/kukushkin/imslowfast/dataset/metadata/behaviours.txt
+    SUBSET_PATH: dataset/metadata/behaviours.txt
   HISTOGRAM:
     ENABLE: True
     TOPK: 3
-    SUBSET_PATH: /home/kukushkin/imslowfast/dataset/metadata/behaviours.txt
+    SUBSET_PATH: dataset/metadata/behaviours.txt
   WRONG_PRED_VIS: 
     ENABLE:   False
     #SUBSET_PATH: /home/kukushkin/imslowfast/dataset/gradcam

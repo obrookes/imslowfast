@@ -277,6 +277,9 @@ def train_epoch(
                     ):
                         preds = model(inputs, alpha)
 
+                    else:
+                        preds = model(inputs, alpha)
+
             elif cfg.FRAMEWISE_MIXUP.ENABLE:
                 preds, lam, index = model(inputs)
             else:
@@ -814,6 +817,8 @@ def train(cfg):
                 cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MAX,
                 cfg.SOLVER.MAX_EPOCH,
             )
+    else:
+        alpha_scheduler = None
 
     # Init multigrid.
     multigrid = None
@@ -977,6 +982,11 @@ def train(cfg):
 
         # Train for one epoch.
         epoch_timer.epoch_tic()
+        if alpha_scheduler:
+            alpha = alpha_scheduler[cur_epoch]
+        else:
+            alpha = 0.0
+
         train_epoch(
             train_loader,
             model,
@@ -987,7 +997,7 @@ def train(cfg):
             cfg,
             writer,
             pseudo_labels,
-            alpha_scheduler[cur_epoch],
+            alpha,
         )
         epoch_timer.epoch_toc()
         logger.info(

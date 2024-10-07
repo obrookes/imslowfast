@@ -1580,6 +1580,8 @@ class ResNetFGBGMixup(nn.Module):
         self.ortho_embs = cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS
         self.add_bg = cfg.FG_BG_MIXUP.ADD_BG.ENABLE
         self.add_bg2 = cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+        self.concat_bg_frames = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE
+        self.concat_bg_frames_ratio = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO
 
         self._construct_network(cfg)
         init_helper.init_weights(
@@ -1775,6 +1777,32 @@ class ResNetFGBGMixup(nn.Module):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
 
+        if self.concat_bg_frames and self.concat_bg_frames_ratio > 0.0:
+            # select random bg frames
+            bg_frames = x["bg_frames"][0]
+            fg_frames = x["fg_frames"][0]
+
+            # take a random subset of bg_frames using concat_bg_frames_ratio
+            num_bg_frames = int(bg_frames.shape[2] * self.concat_bg_frames_ratio)
+            indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
+            # sort indices
+            indices = torch.sort(indices).values
+
+            selected_bg_frames = bg_frames[:, :, indices, :, :]
+
+            # concatenate bg_frames to fg_frames
+            concat_frames = torch.cat(
+                [
+                    fg_frames,
+                    selected_bg_frames,
+                ],
+                dim=2,
+            )
+
+            assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
+
+            x["fg_frames"][0] = concat_frames
+
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
                 if (k == "bg_frames") or (k == "bg2_frames"):
@@ -1884,6 +1912,7 @@ class ResNetFGBGMixup(nn.Module):
         else:
             embs = emb_dict["fg_frames"]
         x = self.projection(embs)
+
         return x
 
     def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, alpha=None, beta=None):
