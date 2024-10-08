@@ -207,12 +207,7 @@ def train_epoch(
 
             # Forward pass model
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                (
-                    model,
-                    preds,
-                    partial_loss,
-                    perform_backward,
-                ) = contrastive_forward(
+                (model, preds, partial_loss, perform_backward,) = contrastive_forward(
                     model, cfg, inputs, index, time, epoch_exact, scaler
                 )
             elif cfg.DETECTION.ENABLE:
@@ -1056,6 +1051,11 @@ def train(cfg):
             )
         # Evaluate the model on validation set.
         if is_eval_epoch:
+
+            alpha_scheduler_value = (
+                alpha_scheduler[cur_epoch] if alpha_scheduler is not None else 0.0
+            )
+
             eval_epoch(
                 val_loader,
                 model,
@@ -1064,7 +1064,7 @@ def train(cfg):
                 cfg,
                 train_loader,
                 writer,
-                alpha_scheduler[cur_epoch],
+                alpha_scheduler_value,
             )
     if (
         start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE
