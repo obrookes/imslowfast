@@ -8,20 +8,34 @@ from torchmetrics.functional.classification import (
 )
 
 
-def get_feature_map(model, sample):
+def get_feature_map(model, sample, layer="s5"):
     # Get device
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Move model and data to device
     sample = sample.to(device)
     model = model.to(device)
-
-    with torch.no_grad():
-        feature_map = model.s5(
-            model.s4(model.s3(model.s2(model.s1([sample.unsqueeze(0)]))))
-        )[
-            0
-        ]  # TODO: Investigate features at earlier layers
+    if layer == "s1":
+        with torch.no_grad():
+            feature_map = model.s1([sample.unsqueeze(0)])[0]
+    elif layer == "s2":
+        with torch.no_grad():
+            feature_map = model.s2(model.s1([sample.unsqueeze(0)]))[0]
+    elif layer == "s3":
+        with torch.no_grad():
+            feature_map = model.s3(model.s2(model.s1([sample.unsqueeze(0)])))[0]
+    elif layer == "s4":
+        with torch.no_grad():
+            feature_map = model.s4(model.s3(model.s2(model.s1([sample.unsqueeze(0)]))))[
+                0
+            ]
+    elif layer == "s5":
+        with torch.no_grad():
+            feature_map = model.s5(
+                model.s4(model.s3(model.s2(model.s1([sample.unsqueeze(0)]))))
+            )[
+                0
+            ]  # TODO: Investigate features at earlier layers
     return feature_map
 
 
@@ -157,12 +171,41 @@ def gen_temporal_mask(
 
 # Weight features with the mask
 def weight_features(framewise_features, mask):
+    # [B, T, D]
+    # [B, T] i.e., [1,.1, 0.75, 0.5]...
     weighted_features = []
     for frame_idx in range(len(mask)):
         # Weight the features
         weighted_feature = framewise_features[frame_idx] * mask[frame_idx]
         weighted_features.append(weighted_feature)
     weighted_features = torch.stack(weighted_features)
+    return weighted_features
+
+
+def weight_and_renormalize_features(framewise_features, mask):
+    weighted_features = []
+    original_norms = []
+
+    for frame_idx in range(len(mask)):
+        # Store the original norm
+        original_norm = torch.norm(framewise_features[frame_idx])
+        original_norms.append(original_norm)
+
+        # Weight the features
+        weighted_feature = framewise_features[frame_idx] * mask[frame_idx]
+        weighted_features.append(weighted_feature)
+
+    weighted_features = torch.stack(weighted_features)
+
+    # TODO: enhance noise when x is small
+
+    # Renormalize the weighted features
+    for frame_idx in range(len(mask)):
+        current_norm = torch.norm(weighted_features[frame_idx])
+        if current_norm > 0:  # Avoid division by zero
+            scale_factor = original_norms[frame_idx] / current_norm
+            weighted_features[frame_idx] *= scale_factor
+
     return weighted_features
 
 
@@ -174,6 +217,7 @@ def get_weighted_features(
     mask_thresh=None,
     weight_features_by_mask=True,
     return_mask=False,
+    renormalize=False,
 ):
 
     weighted_feats = []
@@ -192,10 +236,15 @@ def get_weighted_features(
     )  # [1, 16]
 
     if weight_features_by_mask:
-        # Weight the frame-wise features with the mask
-        weighted_framewise_features = weight_features(
-            fg_framewise_features, mask[0]
-        )  # [16, 2048]
+        if renormalize:
+            weighted_framewise_features = weight_and_renormalize_features(
+                fg_framewise_features, mask[0]
+            )
+        else:
+            # Weight the frame-wise features with the mask
+            weighted_framewise_features = weight_features(
+                fg_framewise_features, mask[0]
+            )  # [16, 2048]
         weighted_feats.append(weighted_framewise_features)
     else:
         mask[mask > mask_thresh] = 1
@@ -251,6 +300,8 @@ def calculate_masking_results(
     segments,
     weight_features_by_mask=True,
     return_mask=True,
+    weight_thresh=None,
+    mask_thresh=None,
 ):
 
     results_df = None
@@ -271,7 +322,8 @@ def calculate_masking_results(
                 fg_sample,
                 bg_sample,
                 classifier,
-                thresh=thresh,
+                weight_thresh=weight_thresh,
+                mask_thresh=mask_thresh,
                 weight_features_by_mask=weight_features_by_mask,
                 return_mask=return_mask,
             )

@@ -1,7 +1,7 @@
 TRAIN:
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 1
+  BATCH_SIZE: 2
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   CHECKPOINT_FILE_PATH: SLOWONLY_8x8_R50.pkl
@@ -50,10 +50,9 @@ MODEL:
   NUM_CLASSES: 14
   ARCH: slow
   MODEL_NAME: ResNet
-  HEAD_ACT: none
-  LOSS_FUNC: bce_logit
+  HEAD_ACT: sigmoid
+  LOSS_FUNC: anls
   DROPOUT_RATE: 0.5
-  LOSS_FUNC: unique_combination_loss
 SAMPLING:
   BALANCED: False
 TEST:

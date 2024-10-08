@@ -81,8 +81,6 @@ class AssumeNegativeLabelSmoothingLoss(nn.Module):
         probabilities = probabilities.float()
         targets = targets.float()
 
-        probabilities = torch.sigmoid(probabilities)
-
         # Get the number of classes (L)
         num_classes = probabilities.size(1)
 
@@ -164,6 +162,8 @@ _LOSSES = {
     "contrastive_loss": ContrastiveLoss,
     "mse": nn.MSELoss,
     "multi_mse": MultipleMSELoss,
+    "anls": AssumeNegativeLabelSmoothingLoss,
+    "wan": WeakAssumeNegativeLoss,
 }
 
 
