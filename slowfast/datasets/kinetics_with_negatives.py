@@ -10,7 +10,7 @@ import pandas
 import torch
 import torch.utils.data
 from torchvision import transforms
-
+import torch.nn.functional as F
 import slowfast.utils.logging as logging
 from slowfast.utils.env import pathmgr
 
@@ -534,6 +534,7 @@ class Nkinetics(torch.utils.data.Dataset):
 
                     time_idx_out[idx] = time_idx_decoded[i, :]
 
+                    # [0,1] normalization
                     fg_out[idx] = fg_out[idx].float()
                     fg_out[idx] = fg_out[idx] / 255.0
                     bg_out[idx] = bg_out[idx].float()
@@ -599,17 +600,24 @@ class Nkinetics(torch.utils.data.Dataset):
                         bg2_out[idx] = bg2_out[idx].permute(0, 2, 3, 1)
 
                     # Perform color normalization.
-                    fg_out[idx] = utils.tensor_normalize(
-                        fg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    )
+                    if self.cfg.DATA.USE_MEAN:
+                        fg_out[idx] = utils.tensor_normalize(
+                            fg_out[idx],
+                            self.cfg.DATA.MEAN,
+                            self.cfg.DATA.STD,
+                        )
 
-                    bg_out[idx] = utils.tensor_normalize(
-                        bg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    )
+                        bg_out[idx] = utils.tensor_normalize(
+                            bg_out[idx],
+                            self.cfg.DATA.MEAN,
+                            self.cfg.DATA.STD,
+                        )
 
-                    bg2_out[idx] = utils.tensor_normalize(
-                        bg2_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    )
+                        bg2_out[idx] = utils.tensor_normalize(
+                            bg2_out[idx],
+                            self.cfg.DATA.MEAN,
+                            self.cfg.DATA.STD,
+                        )
 
                     # T H W C -> C T H W.
                     fg_out[idx] = fg_out[idx].permute(3, 0, 1, 2)
@@ -626,56 +634,85 @@ class Nkinetics(torch.utils.data.Dataset):
                     relative_aspect = (
                         None if (self.mode not in ["train"] or len(asp) == 0) else asp
                     )
-                    fg_out[idx] = utils.spatial_sampling(
-                        fg_out[idx],
-                        spatial_idx=spatial_sample_index,
-                        min_scale=min_scale[i],
-                        max_scale=max_scale[i],
-                        crop_size=crop_size[i],
-                        random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
-                        inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-                        aspect_ratio=relative_aspect,
-                        scale=relative_scales,
-                        motion_shift=(
-                            self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-                            if self.mode in ["train"]
-                            else False
-                        ),
-                    )
 
-                    bg_out[idx] = utils.spatial_sampling(
-                        bg_out[idx],
-                        spatial_idx=spatial_sample_index,
-                        min_scale=min_scale[i],
-                        max_scale=max_scale[i],
-                        crop_size=crop_size[i],
-                        random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
-                        inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-                        aspect_ratio=relative_aspect,
-                        scale=relative_scales,
-                        motion_shift=(
-                            self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-                            if self.mode in ["train"]
-                            else False
-                        ),
-                    )
+                    if self.cfg.DATA.SPATIAL_SAMPLING:
+                        fg_out[idx] = utils.spatial_sampling(
+                            fg_out[idx],
+                            spatial_idx=spatial_sample_index,
+                            min_scale=min_scale[i],
+                            max_scale=max_scale[i],
+                            crop_size=crop_size[i],
+                            random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                            inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
+                            aspect_ratio=relative_aspect,
+                            scale=relative_scales,
+                            motion_shift=(
+                                self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
+                                if self.mode in ["train"]
+                                else False
+                            ),
+                        )
 
-                    bg2_out[idx] = utils.spatial_sampling(
-                        bg2_out[idx],
-                        spatial_idx=spatial_sample_index,
-                        min_scale=min_scale[i],
-                        max_scale=max_scale[i],
-                        crop_size=crop_size[i],
-                        random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
-                        inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-                        aspect_ratio=relative_aspect,
-                        scale=relative_scales,
-                        motion_shift=(
-                            self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-                            if self.mode in ["train"]
-                            else False
-                        ),
-                    )
+                        bg_out[idx] = utils.spatial_sampling(
+                            bg_out[idx],
+                            spatial_idx=spatial_sample_index,
+                            min_scale=min_scale[i],
+                            max_scale=max_scale[i],
+                            crop_size=crop_size[i],
+                            random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                            inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
+                            aspect_ratio=relative_aspect,
+                            scale=relative_scales,
+                            motion_shift=(
+                                self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
+                                if self.mode in ["train"]
+                                else False
+                            ),
+                        )
+
+                        bg2_out[idx] = utils.spatial_sampling(
+                            bg2_out[idx],
+                            spatial_idx=spatial_sample_index,
+                            min_scale=min_scale[i],
+                            max_scale=max_scale[i],
+                            crop_size=crop_size[i],
+                            random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                            inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
+                            aspect_ratio=relative_aspect,
+                            scale=relative_scales,
+                            motion_shift=(
+                                self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
+                                if self.mode in ["train"]
+                                else False
+                            ),
+                        )
+                    else:
+                        fg_out[idx] = F.interpolate(
+                            fg_out[idx],
+                            size=(
+                                self.cfg.DATA.DECODING_SHORT_SIZE,
+                                self.cfg.DATA.DECODING_SHORT_SIZE,
+                            ),
+                            mode="nearest",
+                        )
+
+                        bg_out[idx] = F.interpolate(
+                            bg_out[idx],
+                            size=(
+                                self.cfg.DATA.DECODING_SHORT_SIZE,
+                                self.cfg.DATA.DECODING_SHORT_SIZE,
+                            ),
+                            mode="nearest",
+                        )
+
+                        bg2_out[idx] = F.interpolate(
+                            bg2_out[idx],
+                            size=(
+                                self.cfg.DATA.DECODING_SHORT_SIZE,
+                                self.cfg.DATA.DECODING_SHORT_SIZE,
+                            ),
+                            mode="nearest",
+                        )
 
                     if self.rand_erase:
                         erase_transform = RandomErasing(
