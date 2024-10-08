@@ -9,6 +9,7 @@ dataset/metadata/metadata.csv
 dataset/metadata/metadata_with_desc.csv
 catboost_info/
 cam_videos/
+results_dir/
 cam_original/
 weights/
 

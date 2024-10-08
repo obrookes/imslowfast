@@ -1,9 +1,9 @@
 TRAIN:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 10
+  BATCH_SIZE: 8
   EVAL_PERIOD: 1
-  CHECKPOINT_PERIOD: 100
+  CHECKPOINT_PERIOD: 1
   CHECKPOINT_FILE_PATH: projects/slow/SLOWONLY_8x8_R50.pkl
   CHECKPOINT_TYPE: caffe2
   MIXED_PRECISION: True
@@ -11,7 +11,8 @@ TRAIN:
 TEST:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 10
+  CHECKPOINT_FILE_PATH: /home/kukushkin/imslowfast/results/model=slow_r50_ds=panaf_seq_with_negatives-epoch=bgfgmixup/checkpoints/checkpoint_epoch_00001.pyth
+  BATCH_SIZE: 16
   NUM_ENSEMBLE_VIEWS: 1
   NUM_SPATIAL_CROPS: 1
 DATA:
@@ -21,21 +22,29 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/fgbgmixup
-  PATH_PREFIX: /home/kukushkin/imslowfast/dataset/videos/
+  PATH_TO_DATA_DIR: dataset/annotations/fgbgmixup
+  PATH_PREFIX: dataset/videos/
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
   # DECODING_BACKEND: pyav #torchvision or pyav
 
 FG_BG_MIXUP:
   ENABLE: True
+  ADD_BG: 
+    ENABLE: False
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
   SUBTRACT_BG: 
     ENABLE: True
     ALPHA_MIN: 0.0
     ALPHA_MAX: 1.0
+    ORTHO_EMBS: False # use orthogonal embeddings for bg subtraction (and addition, when ADD_BG2 is enabled)
     SCHEDULER: exp  #linear, exp
-  ADD_BG2:
-    ENABLE: False
+    APPLY_CLASSWISE: # apply bg subtraction for certain classes only
+      ENABLE: False
+      CLASSES: [0, 1, 3, 4, 5, 11, 12, 13] # provide a list of allowed labels, so forbidden labels are [2, 6, 7, 8, 9, 10] 
+  ADD_BG2: # add another background to the video
+    ENABLE: True
     START_FROM_EPOCH: 0
   SELECT_RAND_BG_FRAME:
     ENABLE: False
@@ -44,14 +53,14 @@ FG_BG_MIXUP:
 
 TENSORBOARD:
   ENABLE: False
-  CLASS_NAMES_PATH: /home/kukushkin/imslowfast/dataset/metadata/behaviours.json
+  CLASS_NAMES_PATH: dataset/metadata/behaviours.json
   CONFUSION_MATRIX:
     ENABLE: True
-    SUBSET_PATH: /home/kukushkin/imslowfast/dataset/metadata/behaviours.txt
+    SUBSET_PATH: dataset/metadata/behaviours.txt
   HISTOGRAM:
     ENABLE: True
     TOPK: 3
-    SUBSET_PATH: /home/kukushkin/imslowfast/dataset/metadata/behaviours.txt
+    SUBSET_PATH: dataset/metadata/behaviours.txt
   WRONG_PRED_VIS: 
     ENABLE:   False
     #SUBSET_PATH: /home/kukushkin/imslowfast/dataset/gradcam
@@ -83,7 +92,7 @@ BN:
 SOLVER:
   BASE_LR: 2.5e-1
   LR_POLICY: cosine
-  MAX_EPOCH: 200
+  MAX_EPOCH: 5
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
   WARMUP_EPOCHS: 5.0

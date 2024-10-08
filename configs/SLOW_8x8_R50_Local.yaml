@@ -14,7 +14,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/dl18206/Desktop/phd/code/personal/facebook/slowfast/dataset/annotations/standard/fg_only/few_shot/all
+  PATH_TO_DATA_DIR: dataset/annotations/standard/fg_only/few_shot/background
   PATH_PREFIX: /home/dl18206/Desktop/phd/data/panaf/panaf_sequence
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
