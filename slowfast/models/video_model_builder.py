@@ -2063,8 +2063,8 @@ class DualResNetFGBG(nn.Module):
         width_per_group = cfg.RESNET.WIDTH_PER_GROUP
         dim_inner = num_groups * width_per_group
 
-        fg_model = ResNetFGBGMixup(cfg)
-        bg_model = ResNetFGBGMixup(cfg)
+        fg_model = ResNet(cfg)
+        bg_model = ResNet(cfg)
 
         cu.load_checkpoint(
             cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
@@ -2084,9 +2084,8 @@ class DualResNetFGBG(nn.Module):
             convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
         )
 
-        # freeze the models
-        self.bg_model = bg_model.eval()
-        self.fg_model = fg_model.eval()
+        self.bg_model = bg_model
+        self.fg_model = fg_model
 
         self.linear_1 = nn.Linear(4194304, cfg.MODEL.HEAD_MLP_DIM)
         self.linear_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
@@ -2129,21 +2128,22 @@ class DualResNetFGBG(nn.Module):
         self.projection = self.head.projection
 
     def forward(self, x, alpha=0.0):
-        bg_model_output = self.bg_model.s5(
-            self.bg_model.s4(
-                self.bg_model.s3(
-                    self.bg_model.s2(self.bg_model.s1([x["bg_frames"][0]]))
+        with torch.no_grad():
+            bg_model_output = self.bg_model.s5(
+                self.bg_model.s4(
+                    self.bg_model.s3(
+                        self.bg_model.s2(self.bg_model.s1([x["bg_frames"][0]]))
+                    )
                 )
-            )
-        )[0]
+            )[0]
 
-        fg_model_output = self.fg_model.s5(
-            self.fg_model.s4(
-                self.fg_model.s3(
-                    self.fg_model.s2(self.fg_model.s1([x["fg_frames"][0]]))
+            fg_model_output = self.fg_model.s5(
+                self.fg_model.s4(
+                    self.fg_model.s3(
+                        self.fg_model.s2(self.fg_model.s1([x["fg_frames"][0]]))
+                    )
                 )
-            )
-        )[0]
+            )[0]
 
         x = torch.concat([fg_model_output, bg_model_output], dim=1)
         # flatten
