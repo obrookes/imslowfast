@@ -63,6 +63,7 @@ MODEL:
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
+  HEAD_MLP_DIM: 2048
 SAMPLING:
   BALANCED: False
 TEST:
@@ -79,4 +80,4 @@ NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: /home/kukushkin/imslowfast/results/model=slow_r50_fgbg_local_concat_models
+OUTPUT_DIR: /home/kukushkin/imslowfast/results/model=dual_slow_r50_fgbg

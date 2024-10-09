@@ -515,6 +515,9 @@ _C.MODEL.FP16_ALLREDUCE = False
 
 _C.MODEL.FEAT_AGGREGATOR = "avg_pool"
 
+# use for dual fg bg model only
+_C.MODEL.HEAD_MLP_DIM = 2048
+
 
 # -----------------------------------------------------------------------------
 # MViT options

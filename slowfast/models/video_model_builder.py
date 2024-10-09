@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.init import trunc_normal_
 
+import slowfast.utils.checkpoint as cu
 import slowfast.utils.logging as logging
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.attention import MultiScaleBlock
@@ -2063,17 +2064,38 @@ class DualResNetFGBG(nn.Module):
         dim_inner = num_groups * width_per_group
 
         # load backbone bg model and fg model
-        fg_model = ResNetFGBGMixup(cfg)
-        bg_model = ResNetFGBGMixup(cfg)
+        model_cfg = cfg.clone()
+        model_cfg.defrost()
+        model_cfg.MODEL.DETACH_HEAD = True
+        fg_model = ResNetFGBGMixup(model_cfg)
+        bg_model = ResNetFGBGMixup(model_cfg)
 
-        fg_model = torch.load(cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH)
-        bg_model = torch.load(cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH)
+        cu.load_checkpoint(
+            cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
+            fg_model,
+            cfg.NUM_GPUS > 1,
+            None,
+            inflation=False,
+            convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
+        )
+
+        cu.load_checkpoint(
+            cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
+            fg_model,
+            cfg.NUM_GPUS > 1,
+            None,
+            inflation=False,
+            convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
+        )
+
+        # fg_model = torch.load(cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH)
+        # bg_model = torch.load(cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH)
 
         self.bg_model = bg_model
         self.fg_model = fg_model
 
-        self.mlp_1 = nn.Linear(2 * cfg.MODEL.DIM_C, cfg.MODEL.DIM_C)
-        self.mlp_2 = nn.Linear(cfg.MODEL.DIM_C, cfg.MODEL.DIM_C)
+        self.mlp_1 = nn.Linear(2 * cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
+        self.mlp_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
 
         if self.enable_detection:
             self.head = head_helper.ResNetRoIHead(
@@ -2113,41 +2135,13 @@ class DualResNetFGBG(nn.Module):
         self.projection = self.head.projection
 
     def forward(self, x):
-        bg_model_output = self.forward_model(x, self.bg_model)
-        fg_model_output = self.forward_model(x, self.fg_model)
+        bg_model_output = self.bg_model(x)
+        fg_model_output = self.fg_model(x)
 
         x = torch.cat([bg_model_output, fg_model_output], dim=1)
         x = F.relu(self.mlp_1(x))
         x = self.mlp_2(x)
         x = self.projection(x)
-
-        return x
-
-    def forward_model(self, x, model):
-        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
-        mask = x["mask"]
-
-        for k, v in x.items():
-            if (k != "mask") and (k != "utm"):
-                if (k == "bg_frames") or (k == "bg2_frames"):
-                    x = v[:]
-                    x = model.s1(x)
-                    x = model.s2(x)
-                    y = []
-                    for pathway in range(self.num_pathways):
-                        pool = getattr(self, "pathway{}_pool".format(pathway))
-                        y.append(pool(x[pathway]))
-                    x = model.s3(y)
-                    x = model.s4(x)
-                    x = model.s5(x)
-                    x = torch.cat(x, 1)
-                    x = self.feat_agg(x)
-                    x = torch.flatten(x, 1)
-                    emb_dict[k] = x
-
-        mask = mask.clone().detach().bool()
-        embs = emb_dict["fg_frames"]
-        x = self.projection(embs)
 
         return x
 
