@@ -1,3 +1,5 @@
+import os
+import cv2
 import ast
 import pickle as pkl
 
@@ -8,6 +10,10 @@ import torch
 from torchmetrics.functional.classification import (
     multilabel_average_precision,
 )
+
+from slowfast.models import build_model
+from slowfast.utils.checkpoint import load_checkpoint
+from slowfast.utils.parser import load_config, alt_parse_args
 
 plt.style.use("science")
 
@@ -286,3 +292,108 @@ def return_sorted_heatmap(df, normalize=False):
     heatmap_data.reset_index(inplace=True)
 
     return heatmap_data
+
+
+# For CAM processing
+
+
+def alt_load_config(cfg_path):
+    args = alt_parse_args()[:-1]
+    cfg = load_config(
+        args[0],
+        path_to_config=cfg_path,
+    )
+    return cfg
+
+
+def load_model(cfg_path, ckpt_path, map_location="cpu", ckpt_type="pytorch"):
+    # Load model config
+    cfg = alt_load_config(cfg_path)
+    model = build_model(cfg)
+    if ckpt_type == "pytorch":
+        checkpoint = torch.load(ckpt_path, map_location=map_location)
+        model.load_state_dict(checkpoint["model_state"])
+    elif ckpt_type == "caffe2":
+        load_checkpoint(
+            path_to_checkpoint=ckpt_path,
+            model=model,
+            convert_from_caffe2=True,
+            data_parallel=False,
+        )
+    else:
+        raise ValueError("Invalid checkpoint type. Choose 'pytorch' or 'caffe2'")
+    return model
+
+
+def get_feature_maps(model, inputs):
+    model.eval()
+    # Ensure inputs and model on device
+    if torch.cuda.is_available():
+        model = model.cuda()
+        inputs = inputs.cuda()
+    with torch.no_grad():
+        return model.s5(model.s4(model.s3(model.s2(model.s1([inputs])))))[0]
+
+
+def return_spatial_cam(
+    feature_conv, weight_softmax, class_idx, size_upsample=(256, 256), normalise=False
+):
+    bz, nc, h, w = feature_conv.shape
+    output_cam = []
+    for idx in class_idx:
+        cam = weight_softmax[idx].dot(feature_conv.reshape((nc, h * w)))
+        cam = cam.reshape(h, w)
+        # Min max normalization
+        if normalise:
+            cam = cam - np.min(cam)
+            cam_img = cam / np.max(cam)
+            cam_img = np.uint8(255 * cam_img)
+            cam = cam_img
+        if size_upsample is not None:
+            cam = cv2.resize(cam, size_upsample)
+        output_cam.append(cam)
+    return np.stack(output_cam)
+
+
+def return_spatio_temporal_cam(
+    feature_conv,
+    weight_softmax,
+    class_idx,
+    size_upsample=(256, 256),
+    normalise=False,
+):
+    # generate the class activation maps upsample to 256x256
+    bsz, nc, t, h, w = feature_conv.shape
+    batch_cam = []
+    for batch in range(bsz):
+        spatio_temporal_cam = []
+        for t_step in range(t):
+            spatial_cam = []
+            spatial_conv = feature_conv[batch, :, t_step, :, :].unsqueeze(0)
+            spatial_cam = return_spatial_cam(
+                spatial_conv, weight_softmax, class_idx, size_upsample, normalise
+            )
+            spatio_temporal_cam.append(spatial_cam)
+        batch_cam.append(spatio_temporal_cam)
+    return np.stack(batch_cam)
+
+
+def get_video_frames(video_name, video_path):
+    # Get original video
+
+    batch_frames = []
+
+    for path in video_name:
+        cap = cv2.VideoCapture(os.path.join(video_path, path))
+        frames = []
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.resize(frame, (256, 256))
+            frames.append(frame)
+
+        batch_frames.append(np.stack(frames))
+
+    return np.stack(batch_frames)

@@ -728,11 +728,17 @@ _C.SLOWFAST.FUSION_KERNEL_SZ = 5
 # -----------------------------------------------------------------------------
 _C.DATA = CfgNode()
 
+# Switch spatial sampling on/off
+_C.DATA.SPATIAL_SAMPLING = False
+
 # The path to the data directory.
 _C.DATA.PATH_TO_DATA_DIR = ""
 
 # The separator used between path and label.
 _C.DATA.PATH_LABEL_SEPARATOR = " "
+
+# The separator used between path and label.
+_C.DATA.PATH_LABEL_SEPARATOR_IDX = -1
 
 # Video path prefix if any.
 _C.DATA.PATH_PREFIX = ""
@@ -757,6 +763,11 @@ _C.DATA.TRAIN_PCA_EIGVEC = [
 # `{"im_path": im_path, "class": cont_id}`
 # then we can skip the construction of imdb and load it from the local file.
 _C.DATA.PATH_TO_PRELOAD_IMDB = ""
+
+# If true use mean and std for normalization.
+_C.DATA.USE_MEAN = True
+
+_C.DATA.MEAN = [0.45, 0.45, 0.45]
 
 # The mean value of the video raw pixels across the R G B channels.
 _C.DATA.MEAN = [0.45, 0.45, 0.45]
