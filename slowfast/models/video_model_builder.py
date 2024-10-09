@@ -2087,7 +2087,7 @@ class DualResNetFGBG(nn.Module):
         self.bg_model = bg_model
         self.fg_model = fg_model
 
-        self.linear_1 = nn.Linear(4194304, cfg.MODEL.HEAD_MLP_DIM)
+        self.linear_1 = nn.Linear(2 * cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
         self.linear_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
 
         if self.enable_detection:
@@ -2145,9 +2145,13 @@ class DualResNetFGBG(nn.Module):
                 )
             )[0]
 
-        x = torch.concat([fg_model_output, bg_model_output], dim=1)
-        # flatten
-        x = torch.flatten(x, 1)
+            fg_model_output = F.adaptive_avg_pool3d(fg_model_output, (1, 1, 1))
+            bg_model_output = F.adaptive_avg_pool3d(bg_model_output, (1, 1, 1))
+
+            x = torch.concat([fg_model_output, bg_model_output], dim=1)
+            # flatten
+            x = torch.flatten(x, 1)
+
         x = self.linear_1(x)
         x = F.relu(x)
         x = self.linear_2(x)
