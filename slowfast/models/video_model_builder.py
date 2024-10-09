@@ -2089,6 +2089,7 @@ class DualResNetFGBG(nn.Module):
 
         self.linear_1 = nn.Linear(2 * cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
         self.linear_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
+        self.linear_3 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
 
         if self.enable_detection:
             self.head = head_helper.ResNetRoIHead(
@@ -2155,6 +2156,9 @@ class DualResNetFGBG(nn.Module):
         x = self.linear_1(x)
         x = F.relu(x)
         x = self.linear_2(x)
+        x = F.relu(x)
+        x = self.linear_3(x)
+        x = F.relu(x)
         x = self.projection(x)
 
         return x

@@ -1,7 +1,7 @@
 TRAIN:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 1
+  BATCH_SIZE: 64
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   BG_MODEL_CHECKPOINT_FILE_PATH:  /home/kukushkin/imslowfast/results_dir/model=slow_r50_bg-only_rm-bg_e300.pyth
@@ -71,7 +71,7 @@ TEST:
   #CHECKPOINT_FILE_PATH: weights/best_ckpt.pyth
   #CHECKPOINT_TYPE: pytorch
   DATASET: nkinetics
-  BATCH_SIZE: 1
+  BATCH_SIZE: 64
   RETURN_FEATS: False
 DATA_LOADER:
   NUM_WORKERS: 8
