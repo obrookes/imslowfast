@@ -1777,31 +1777,37 @@ class ResNetFGBGMixup(nn.Module):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
 
-        if self.concat_bg_frames and self.concat_bg_frames_ratio > 0.0:
-            # select random bg frames
-            bg_frames = x["bg_frames"][0]
-            fg_frames = x["fg_frames"][0]
+        if self.concat_bg_frames:
+            if self.concat_bg_frames_ratio > 0.0:
+                # select random bg frames
+                bg_frames = x["bg_frames"][0]
+                fg_frames = x["fg_frames"][0]
 
-            # take a random subset of bg_frames using concat_bg_frames_ratio
-            num_bg_frames = int(bg_frames.shape[2] * self.concat_bg_frames_ratio)
-            indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
-            # sort indices
-            indices = torch.sort(indices).values
+                # take a random subset of bg_frames using concat_bg_frames_ratio
+                num_bg_frames = int(bg_frames.shape[2] * self.concat_bg_frames_ratio)
+                indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
+                # sort indices
+                indices = torch.sort(indices).values
 
-            selected_bg_frames = bg_frames[:, :, indices, :, :]
+                selected_bg_frames = bg_frames[:, :, indices, :, :]
 
-            # concatenate bg_frames to fg_frames
-            concat_frames = torch.cat(
-                [
-                    fg_frames,
-                    selected_bg_frames,
-                ],
-                dim=2,
-            )
+                # concatenate bg_frames to fg_frames
+                concat_frames = torch.cat(
+                    [
+                        fg_frames,
+                        selected_bg_frames,
+                    ],
+                    dim=2,
+                )
 
-            assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
+                assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
 
-            x["fg_frames"][0] = concat_frames
+                x["fg_frames"][0] = concat_frames
+
+            # x should only contain fg_frames now
+            x = {
+                "fg_frames": x["fg_frames"],
+            }
 
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
@@ -2006,6 +2012,144 @@ class ResNetFGBGMixup(nn.Module):
         loss = torch.sum(emb1 * emb2, dim=1)
         loss = torch.mean(loss)
         return torch.abs(loss)
+
+
+@MODEL_REGISTRY.register()
+class DualResNetFGBG(nn.Module):
+    """
+    ResNet model builder. It builds a ResNet like network backbone without
+    lateral connection (C2D, I3D, Slow).
+
+    Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
+    "SlowFast networks for video recognition."
+    https://arxiv.org/pdf/1812.03982.pdf
+
+    Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
+    "Non-local neural networks."
+    https://arxiv.org/pdf/1711.07971.pdf
+    """
+
+    def __init__(self, cfg):
+        """
+        The `__init__` method of any subclass should also contain these
+            arguments.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        super(DualResNetFGBG, self).__init__()
+        self.norm_module = get_norm(cfg)
+        self.enable_detection = cfg.DETECTION.ENABLE
+        self.num_pathways = 1
+
+        self._construct_network(cfg)
+        init_helper.init_weights(
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
+        )
+
+    def _construct_network(self, cfg):
+        assert cfg.MODEL.ARCH in _POOL1.keys()
+        pool_size = _POOL1[cfg.MODEL.ARCH]
+        assert len({len(pool_size), self.num_pathways}) == 1
+        assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
+
+        num_groups = cfg.RESNET.NUM_GROUPS
+        width_per_group = cfg.RESNET.WIDTH_PER_GROUP
+        dim_inner = num_groups * width_per_group
+
+        # load backbone bg model and fg model
+        fg_model = ResNetFGBGMixup(cfg)
+        bg_model = ResNetFGBGMixup(cfg)
+
+        fg_model = torch.load(cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH)
+        bg_model = torch.load(cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH)
+
+        self.bg_model = bg_model
+        self.fg_model = fg_model
+
+        self.mlp_1 = nn.Linear(2 * cfg.MODEL.DIM_C, cfg.MODEL.DIM_C)
+        self.mlp_2 = nn.Linear(cfg.MODEL.DIM_C, cfg.MODEL.DIM_C)
+
+        if self.enable_detection:
+            self.head = head_helper.ResNetRoIHead(
+                dim_in=[width_per_group * 32],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=[[cfg.DATA.NUM_FRAMES // pool_size[0][0], 1, 1]],
+                resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2],
+                scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR],
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+            )
+        else:
+            self.head = head_helper.ResNetBasicHead(
+                dim_in=[width_per_group * 32],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=(
+                    [None]
+                    if cfg.MULTIGRID.SHORT_CYCLE
+                    or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                    else [
+                        [
+                            cfg.DATA.NUM_FRAMES // pool_size[0][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                        ]
+                    ]
+                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                detach_head=cfg.MODEL.DETACH_HEAD,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
+            )
+
+        self.projection = self.head.projection
+
+    def forward(self, x):
+        bg_model_output = self.forward_model(x, self.bg_model)
+        fg_model_output = self.forward_model(x, self.fg_model)
+
+        x = torch.cat([bg_model_output, fg_model_output], dim=1)
+        x = F.relu(self.mlp_1(x))
+        x = self.mlp_2(x)
+        x = self.projection(x)
+
+        return x
+
+    def forward_model(self, x, model):
+        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
+        mask = x["mask"]
+
+        for k, v in x.items():
+            if (k != "mask") and (k != "utm"):
+                if (k == "bg_frames") or (k == "bg2_frames"):
+                    x = v[:]
+                    x = model.s1(x)
+                    x = model.s2(x)
+                    y = []
+                    for pathway in range(self.num_pathways):
+                        pool = getattr(self, "pathway{}_pool".format(pathway))
+                        y.append(pool(x[pathway]))
+                    x = model.s3(y)
+                    x = model.s4(x)
+                    x = model.s5(x)
+                    x = torch.cat(x, 1)
+                    x = self.feat_agg(x)
+                    x = torch.flatten(x, 1)
+                    emb_dict[k] = x
+
+        mask = mask.clone().detach().bool()
+        embs = emb_dict["fg_frames"]
+        x = self.projection(embs)
+
+        return x
 
 
 @MODEL_REGISTRY.register()

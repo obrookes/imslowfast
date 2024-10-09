@@ -201,6 +201,19 @@ _C.TRAIN.MIXED_PRECISION = False
 # if True, inflate some params from imagenet model.
 _C.TRAIN.CHECKPOINT_IN_INIT = False
 
+
+# Path to the bg model checkpoint to load the initial weight.
+_C.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH = ""
+
+# Checkpoint types include `caffe2` or `pytorch`.
+_C.TRAIN.BG_MODEL_CHECKPOINT_TYPE = "pytorch"
+
+# Path to the fg model checkpoint to load the initial weight.
+_C.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH = ""
+
+# Checkpoint types include `caffe2` or `pytorch`.
+_C.TRAIN.FG_MODEL_CHECKPOINT_TYPE = "pytorch"
+
 # ---------------------------------------------------------------------------- #
 # Augmentation options.
 # ---------------------------------------------------------------------------- #
