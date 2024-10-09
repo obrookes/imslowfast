@@ -2063,12 +2063,8 @@ class DualResNetFGBG(nn.Module):
         width_per_group = cfg.RESNET.WIDTH_PER_GROUP
         dim_inner = num_groups * width_per_group
 
-        # load backbone bg model and fg model
-        model_cfg = cfg.clone()
-        model_cfg.defrost()
-        model_cfg.MODEL.DETACH_HEAD = True
-        fg_model = ResNetFGBGMixup(model_cfg)
-        bg_model = ResNetFGBGMixup(model_cfg)
+        fg_model = ResNetFGBGMixup(cfg)
+        bg_model = ResNetFGBGMixup(cfg)
 
         cu.load_checkpoint(
             cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
@@ -2081,21 +2077,19 @@ class DualResNetFGBG(nn.Module):
 
         cu.load_checkpoint(
             cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
-            fg_model,
+            bg_model,
             cfg.NUM_GPUS > 1,
             None,
             inflation=False,
             convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
         )
 
-        # fg_model = torch.load(cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH)
-        # bg_model = torch.load(cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH)
+        # freeze the models
+        self.bg_model = bg_model.eval()
+        self.fg_model = fg_model.eval()
 
-        self.bg_model = bg_model
-        self.fg_model = fg_model
-
-        self.mlp_1 = nn.Linear(2 * cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
-        self.mlp_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
+        self.linear_1 = nn.Linear(4194304, cfg.MODEL.HEAD_MLP_DIM)
+        self.linear_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
 
         if self.enable_detection:
             self.head = head_helper.ResNetRoIHead(
@@ -2134,13 +2128,29 @@ class DualResNetFGBG(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x):
-        bg_model_output = self.bg_model(x)
-        fg_model_output = self.fg_model(x)
+    def forward(self, x, alpha=0.0):
+        bg_model_output = self.bg_model.s5(
+            self.bg_model.s4(
+                self.bg_model.s3(
+                    self.bg_model.s2(self.bg_model.s1([x["bg_frames"][0]]))
+                )
+            )
+        )[0]
 
-        x = torch.cat([bg_model_output, fg_model_output], dim=1)
-        x = F.relu(self.mlp_1(x))
-        x = self.mlp_2(x)
+        fg_model_output = self.fg_model.s5(
+            self.fg_model.s4(
+                self.fg_model.s3(
+                    self.fg_model.s2(self.fg_model.s1([x["fg_frames"][0]]))
+                )
+            )
+        )[0]
+
+        x = torch.concat([fg_model_output, bg_model_output], dim=1)
+        # flatten
+        x = torch.flatten(x, 1)
+        x = self.linear_1(x)
+        x = F.relu(x)
+        x = self.linear_2(x)
         x = self.projection(x)
 
         return x
