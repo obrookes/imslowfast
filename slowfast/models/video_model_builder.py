@@ -2207,34 +2207,31 @@ class ResNetFGBGConcat(nn.Module):
     def forward(self, x, alpha=0.0):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         if self.training:
-            if self.concat_bg_frames:
-                if self.concat_bg_frames_ratio > 0.0:
-                    # select random bg frames
-                    bg_frames = x["bg_frames"][0]
-                    fg_frames = x["fg_frames"][0]
+            if self.concat_bg_frames and self.concat_bg_frames_ratio > 0.0:
+                # select random bg frames
+                bg_frames = x["bg_frames"][0]
+                fg_frames = x["fg_frames"][0]
 
-                    # take a random subset of bg_frames using concat_bg_frames_ratio
-                    num_bg_frames = int(
-                        bg_frames.shape[2] * self.concat_bg_frames_ratio
-                    )
-                    indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
-                    # sort indices
-                    indices = torch.sort(indices).values
+                # take a random subset of bg_frames using concat_bg_frames_ratio
+                num_bg_frames = int(bg_frames.shape[2] * self.concat_bg_frames_ratio)
+                indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
 
-                    selected_bg_frames = bg_frames[:, :, indices, :, :]
+                # sort indices
+                indices = torch.sort(indices).values
+                selected_bg_frames = bg_frames[:, :, indices, :, :]
 
-                    # concatenate bg_frames to fg_frames
-                    concat_frames = torch.cat(
-                        [
-                            fg_frames,
-                            selected_bg_frames,
-                        ],
-                        dim=2,
-                    )
+                # concatenate bg_frames to fg_frames
+                concat_frames = torch.cat(
+                    [
+                        fg_frames,
+                        selected_bg_frames,
+                    ],
+                    dim=2,
+                )
 
-                    assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
+                assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
 
-                    x["fg_frames"][0] = concat_frames
+                x["fg_frames"][0] = concat_frames
 
         # x should only contain fg_frames
         x = {
