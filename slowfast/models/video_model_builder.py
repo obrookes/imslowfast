@@ -1778,38 +1778,6 @@ class ResNetFGBGMixup(nn.Module):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
         mask = x["mask"]
 
-        if self.concat_bg_frames:
-            if self.concat_bg_frames_ratio > 0.0:
-                # select random bg frames
-                bg_frames = x["bg_frames"][0]
-                fg_frames = x["fg_frames"][0]
-
-                # take a random subset of bg_frames using concat_bg_frames_ratio
-                num_bg_frames = int(bg_frames.shape[2] * self.concat_bg_frames_ratio)
-                indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
-                # sort indices
-                indices = torch.sort(indices).values
-
-                selected_bg_frames = bg_frames[:, :, indices, :, :]
-
-                # concatenate bg_frames to fg_frames
-                concat_frames = torch.cat(
-                    [
-                        fg_frames,
-                        selected_bg_frames,
-                    ],
-                    dim=2,
-                )
-
-                assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
-
-                x["fg_frames"][0] = concat_frames
-
-            # x should only contain fg_frames now
-            x = {
-                "fg_frames": x["fg_frames"],
-            }
-
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
                 if (k == "bg_frames") or (k == "bg2_frames"):
@@ -2016,6 +1984,286 @@ class ResNetFGBGMixup(nn.Module):
 
 
 @MODEL_REGISTRY.register()
+class ResNetFGBGConcat(nn.Module):
+    """
+    ResNet model builder. It builds a ResNet like network backbone without
+    lateral connection (C2D, I3D, Slow).
+
+    Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
+    "SlowFast networks for video recognition."
+    https://arxiv.org/pdf/1812.03982.pdf
+
+    Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
+    "Non-local neural networks."
+    https://arxiv.org/pdf/1711.07971.pdf
+    """
+
+    def __init__(self, cfg):
+        """
+        The `__init__` method of any subclass should also contain these
+            arguments.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        super(ResNetFGBGConcat, self).__init__()
+        self.norm_module = get_norm(cfg)
+        self.enable_detection = cfg.DETECTION.ENABLE
+        self.num_pathways = 1
+        self.concat_bg_frames = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE
+        self.concat_bg_frames_ratio = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO
+
+        self._construct_network(cfg)
+        init_helper.init_weights(
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
+        )
+
+    def _construct_network(self, cfg):
+        """
+        Builds a single pathway ResNet model.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        assert cfg.MODEL.ARCH in _POOL1.keys()
+        pool_size = _POOL1[cfg.MODEL.ARCH]
+        assert len({len(pool_size), self.num_pathways}) == 1
+        assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
+
+        (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
+
+        num_groups = cfg.RESNET.NUM_GROUPS
+        width_per_group = cfg.RESNET.WIDTH_PER_GROUP
+        dim_inner = num_groups * width_per_group
+
+        temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
+
+        s1 = stem_helper.VideoModelStem(
+            dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
+            dim_out=[width_per_group],
+            kernel=[temp_kernel[0][0] + [7, 7]],
+            stride=[[1, 2, 2]],
+            padding=[[temp_kernel[0][0][0] // 2, 3, 3]],
+            norm_module=self.norm_module,
+        )
+
+        s2 = resnet_helper.ResStage(
+            dim_in=[width_per_group],
+            dim_out=[width_per_group * 4],
+            dim_inner=[dim_inner],
+            temp_kernel_sizes=temp_kernel[1],
+            stride=cfg.RESNET.SPATIAL_STRIDES[0],
+            num_blocks=[d2],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[0],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[0],
+            nonlocal_group=cfg.NONLOCAL.GROUP[0],
+            nonlocal_pool=cfg.NONLOCAL.POOL[0],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
+        )
+
+        # Based on profiling data of activation size, s1 and s2 have the activation sizes
+        # that are 4X larger than the second largest. Therefore, checkpointing them gives
+        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
+        # with recomputing FLOPs.
+
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+            self.s1 = checkpoint_wrapper(s1)
+            self.s2 = checkpoint_wrapper(s2)
+        else:
+            self.s1 = s1
+            self.s2 = s2
+
+        for pathway in range(self.num_pathways):
+            pool = nn.MaxPool3d(
+                kernel_size=pool_size[pathway],
+                stride=pool_size[pathway],
+                padding=[0, 0, 0],
+            )
+            self.add_module("pathway{}_pool".format(pathway), pool)
+
+        self.s3 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 4],
+            dim_out=[width_per_group * 8],
+            dim_inner=[dim_inner * 2],
+            temp_kernel_sizes=temp_kernel[2],
+            stride=cfg.RESNET.SPATIAL_STRIDES[1],
+            num_blocks=[d3],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[1],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[1],
+            nonlocal_group=cfg.NONLOCAL.GROUP[1],
+            nonlocal_pool=cfg.NONLOCAL.POOL[1],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
+        )
+
+        self.s4 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 8],
+            dim_out=[width_per_group * 16],
+            dim_inner=[dim_inner * 4],
+            temp_kernel_sizes=temp_kernel[3],
+            stride=cfg.RESNET.SPATIAL_STRIDES[2],
+            num_blocks=[d4],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[2],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[2],
+            nonlocal_group=cfg.NONLOCAL.GROUP[2],
+            nonlocal_pool=cfg.NONLOCAL.POOL[2],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
+        )
+
+        self.s5 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 16],
+            dim_out=[width_per_group * 32],
+            dim_inner=[dim_inner * 8],
+            temp_kernel_sizes=temp_kernel[4],
+            stride=cfg.RESNET.SPATIAL_STRIDES[3],
+            num_blocks=[d5],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[3],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[3],
+            nonlocal_group=cfg.NONLOCAL.GROUP[3],
+            nonlocal_pool=cfg.NONLOCAL.POOL[3],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
+        )
+
+        # self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        if cfg.MODEL.FEAT_AGGREGATOR == "avg_pool":
+            self.feat_agg = nn.AdaptiveAvgPool3d((1, 1, 1))
+        elif cfg.MODEL.FEAT_AGGREGATOR == "max_pool":
+            self.feat_agg = nn.AdaptiveMaxPool3d((1, 1, 1))
+        elif cfg.MODEL.FEAT_AGGREGATOR == "conv":
+            self.feat_agg = operators.SeparableConv3d(
+                kernel_size=(16, 8, 8),
+                stride=(1, 1, 1),
+                in_channels=2048,
+                out_channels=2048,
+            )
+
+        if self.enable_detection:
+            self.head = head_helper.ResNetRoIHead(
+                dim_in=[width_per_group * 32],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=[[cfg.DATA.NUM_FRAMES // pool_size[0][0], 1, 1]],
+                resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2],
+                scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR],
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+            )
+        else:
+            self.head = head_helper.ResNetBasicHead(
+                dim_in=[width_per_group * 32],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=(
+                    [None]
+                    if cfg.MULTIGRID.SHORT_CYCLE
+                    or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                    else [
+                        [
+                            cfg.DATA.NUM_FRAMES // pool_size[0][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                        ]
+                    ]
+                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                detach_head=cfg.MODEL.DETACH_HEAD,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
+            )
+
+        self.projection = self.head.projection
+
+    def forward(self, x, alpha=0.0):
+        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
+        if self.training:
+            if self.concat_bg_frames:
+                if self.concat_bg_frames_ratio > 0.0:
+                    # select random bg frames
+                    bg_frames = x["bg_frames"][0]
+                    fg_frames = x["fg_frames"][0]
+
+                    # take a random subset of bg_frames using concat_bg_frames_ratio
+                    num_bg_frames = int(
+                        bg_frames.shape[2] * self.concat_bg_frames_ratio
+                    )
+                    indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
+                    # sort indices
+                    indices = torch.sort(indices).values
+
+                    selected_bg_frames = bg_frames[:, :, indices, :, :]
+
+                    # concatenate bg_frames to fg_frames
+                    concat_frames = torch.cat(
+                        [
+                            fg_frames,
+                            selected_bg_frames,
+                        ],
+                        dim=2,
+                    )
+
+                    assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
+
+                    x["fg_frames"][0] = concat_frames
+
+        # x should only contain fg_frames
+        x = {
+            "fg_frames": x["fg_frames"],
+        }
+
+        for k, v in x.items():
+            x = v[:]  # avoid pass by reference
+            x = self.s1(x)
+            x = self.s2(x)
+            y = []  # Don't modify x list in place due to activation checkpoint.
+            for pathway in range(self.num_pathways):
+                pool = getattr(self, "pathway{}_pool".format(pathway))
+                y.append(pool(x[pathway]))
+            x = self.s3(y)
+            x = self.s4(x)
+            x = self.s5(x)
+            x = torch.cat(x, 1)
+            x = self.feat_agg(x)
+            x = torch.flatten(x, 1)
+            emb_dict[k] = x
+
+        embs = emb_dict["fg_frames"]
+        x = self.projection(embs)
+
+        return x
+
+
+@MODEL_REGISTRY.register()
 class DualResNetFGBG(nn.Module):
     """
     ResNet model builder. It builds a ResNet like network backbone without
@@ -2069,7 +2317,7 @@ class DualResNetFGBG(nn.Module):
         cu.load_checkpoint(
             cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
             fg_model,
-            cfg.NUM_GPUS > 1,
+            False,
             None,
             inflation=False,
             convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
@@ -2078,80 +2326,65 @@ class DualResNetFGBG(nn.Module):
         cu.load_checkpoint(
             cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
             bg_model,
-            cfg.NUM_GPUS > 1,
+            False,
             None,
             inflation=False,
             convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
         )
 
-        self.bg_model = bg_model
-        self.fg_model = fg_model
+        self.bg_model_s1 = bg_model.s1
+        self.bg_model_s2 = bg_model.s2
+        self.bg_model_s3 = bg_model.s3
+        self.bg_model_s4 = bg_model.s4
+        self.bg_model_s5 = bg_model.s5
 
-        self.linear_1 = nn.Linear(2 * cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
-        self.linear_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
-        self.linear_3 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)
+        self.fg_model_s1 = fg_model.s1
+        self.fg_model_s2 = fg_model.s2
+        self.fg_model_s3 = fg_model.s3
+        self.fg_model_s4 = fg_model.s4
+        self.fg_model_s5 = fg_model.s5
 
-        if self.enable_detection:
-            self.head = head_helper.ResNetRoIHead(
-                dim_in=[width_per_group * 32],
-                num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[[cfg.DATA.NUM_FRAMES // pool_size[0][0], 1, 1]],
-                resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2],
-                scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR],
-                dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func=cfg.MODEL.HEAD_ACT,
-                aligned=cfg.DETECTION.ALIGNED,
-                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
-            )
-        else:
-            self.head = head_helper.ResNetBasicHead(
-                dim_in=[width_per_group * 32],
-                num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=(
-                    [None]
-                    if cfg.MULTIGRID.SHORT_CYCLE
-                    or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-                    else [
-                        [
-                            cfg.DATA.NUM_FRAMES // pool_size[0][0],
-                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
-                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
-                        ]
-                    ]
-                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
-                dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func=cfg.MODEL.HEAD_ACT,
-                detach_head=cfg.MODEL.DETACH_HEAD,
-                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
-                cfg=cfg,
-            )
-
-        self.projection = self.head.projection
+        self.linear_1 = nn.Linear(2 * cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)  #
+        self.linear_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM // 2)
+        self.linear_3 = nn.Linear(
+            cfg.MODEL.HEAD_MLP_DIM // 2, cfg.MODEL.HEAD_MLP_DIM // 4
+        )
+        self.projection = nn.Linear(cfg.MODEL.HEAD_MLP_DIM // 4, cfg.MODEL.NUM_CLASSES)
 
     def forward(self, x, alpha=0.0):
-        with torch.no_grad():
-            bg_model_output = self.bg_model.s5(
-                self.bg_model.s4(
-                    self.bg_model.s3(
-                        self.bg_model.s2(self.bg_model.s1([x["bg_frames"][0]]))
-                    )
+        self.bg_model_s1.requires_grad = False
+        self.bg_model_s2.requires_grad = False
+        self.bg_model_s3.requires_grad = False
+        self.bg_model_s4.requires_grad = False
+        self.bg_model_s5.requires_grad = False
+
+        self.fg_model_s1.requires_grad = False
+        self.fg_model_s2.requires_grad = False
+        self.fg_model_s3.requires_grad = False
+        self.fg_model_s4.requires_grad = False
+        self.fg_model_s5.requires_grad = False
+
+        bg_model_output = self.bg_model_s5(
+            self.bg_model_s4(
+                self.bg_model_s3(
+                    self.bg_model_s2(self.bg_model_s1([x["fg_frames"][0]]))
                 )
-            )[0]
+            )
+        )[0]
 
-            fg_model_output = self.fg_model.s5(
-                self.fg_model.s4(
-                    self.fg_model.s3(
-                        self.fg_model.s2(self.fg_model.s1([x["fg_frames"][0]]))
-                    )
+        fg_model_output = self.fg_model_s5(
+            self.fg_model_s4(
+                self.fg_model_s3(
+                    self.fg_model_s2(self.fg_model_s1([x["fg_frames"][0]]))
                 )
-            )[0]
+            )
+        )[0]
 
-            fg_model_output = F.adaptive_avg_pool3d(fg_model_output, (1, 1, 1))
-            bg_model_output = F.adaptive_avg_pool3d(bg_model_output, (1, 1, 1))
+        fg_model_output = F.adaptive_avg_pool3d(fg_model_output, (1, 1, 1))
+        bg_model_output = F.adaptive_avg_pool3d(bg_model_output, (1, 1, 1))
 
-            x = torch.concat([fg_model_output, bg_model_output], dim=1)
-            # flatten
-            x = torch.flatten(x, 1)
+        x = torch.concat([fg_model_output, bg_model_output], dim=1)
+        x = torch.flatten(x, 1)
 
         x = self.linear_1(x)
         x = F.relu(x)
@@ -2160,7 +2393,6 @@ class DualResNetFGBG(nn.Module):
         x = self.linear_3(x)
         x = F.relu(x)
         x = self.projection(x)
-
         return x
 
 

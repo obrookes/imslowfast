@@ -1,14 +1,14 @@
 TRAIN:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 64
+  BATCH_SIZE: 2
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   BG_MODEL_CHECKPOINT_FILE_PATH:  /home/kukushkin/imslowfast/results_dir/model=slow_r50_bg-only_rm-bg_e300.pyth
   BG_MODEL_CHECKPOINT_TYPE: pytorch
   FG_MODEL_CHECKPOINT_FILE_PATH:  /home/kukushkin/imslowfast/results_dir/model=slow_r50_baseline_e300.pyth
   FG_MODEL_CHECKPOINT_TYPE: pytorch
-  AUTO_RESUME: True
+  AUTO_RESUME: False
   MIXED_PRECISION: True
 DATA:
   NUM_FRAMES: 16
@@ -71,12 +71,12 @@ TEST:
   #CHECKPOINT_FILE_PATH: weights/best_ckpt.pyth
   #CHECKPOINT_TYPE: pytorch
   DATASET: nkinetics
-  BATCH_SIZE: 64
+  BATCH_SIZE: 2
   RETURN_FEATS: False
 DATA_LOADER:
-  NUM_WORKERS: 8
+  NUM_WORKERS: 4
   PIN_MEMORY: True
-NUM_GPUS: 1
+NUM_GPUS: 2
 NUM_SHARDS: 1
 RNG_SEED: 0
 LOG_PERIOD: 1

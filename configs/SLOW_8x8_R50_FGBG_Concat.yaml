@@ -1,7 +1,7 @@
 TRAIN:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 2
+  BATCH_SIZE: 16
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   CHECKPOINT_FILE_PATH:  projects/slow/SLOWONLY_8x8_R50.pkl
@@ -57,7 +57,7 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 14
   ARCH: slow
-  MODEL_NAME: ResNetFGBGMixup
+  MODEL_NAME: ResNetFGBGConcat
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
@@ -68,13 +68,13 @@ TEST:
   CHECKPOINT_FILE_PATH: weights/best_ckpt.pyth
   CHECKPOINT_TYPE: pytorch
   DATASET: nkinetics
-  BATCH_SIZE: 1
+  BATCH_SIZE: 16
   RETURN_FEATS: False
 DATA_LOADER:
-  NUM_WORKERS: 8
+  NUM_WORKERS: 
   PIN_MEMORY: True
-NUM_GPUS: 1
+NUM_GPUS: 2
 NUM_SHARDS: 1
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: /home/kukushkin/imslowfast/results/model=slow_r50_fgbg_local_add_bg_frames
+OUTPUT_DIR: /home/kukushkin/imslowfast/results/model=slow_r50_fgbg_concat
