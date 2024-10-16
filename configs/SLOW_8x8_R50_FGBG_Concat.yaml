@@ -27,7 +27,7 @@ FG_BG_MIXUP:
   ENABLE: True
   CONCAT_BG_FRAMES:
     ENABLE: True
-    RATIO: 0.0
+    RATIO: 0.5
 TENSORBOARD:
   ENABLE: True
 RESNET:
@@ -56,7 +56,7 @@ SOLVER:
   OPTIMIZING_METHOD: sgd
 MODEL:
   NUM_CLASSES: 14
-  ARCH: slow
+  ARCH: 2d
   MODEL_NAME: ResNetFGBGConcat
   HEAD_ACT: none
   LOSS_FUNC: bce_logit

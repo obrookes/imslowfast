@@ -2214,10 +2214,34 @@ class ResNetFGBGConcat(nn.Module):
 
                 # take a random subset of bg_frames using concat_bg_frames_ratio
                 num_bg_frames = int(bg_frames.shape[2] * self.concat_bg_frames_ratio)
-                indices = torch.randperm(bg_frames.shape[2])[:num_bg_frames]
 
-                # sort indices
-                indices = torch.sort(indices).values
+                frames_quotient = num_bg_frames // bg_frames.shape[2]
+                frames_remainder = num_bg_frames % bg_frames.shape[2]
+
+                if frames_quotient > 0:
+                    indices = torch.cat(
+                        [
+                            torch.arange(bg_frames.shape[2])
+                            for _ in range(frames_quotient)
+                        ]
+                    )
+                else:
+                    indices = torch.tensor([], dtype=torch.int32)
+
+                if frames_remainder > 0:
+                    remainder_indices = torch.randperm(bg_frames.shape[2])[
+                        :frames_remainder
+                    ]
+                    # sort indices
+                    remainder_indices = torch.sort(remainder_indices).values
+
+                    indices = torch.cat(
+                        [
+                            indices,
+                            remainder_indices,
+                        ]
+                    )
+
                 selected_bg_frames = bg_frames[:, :, indices, :, :]
 
                 # concatenate bg_frames to fg_frames
