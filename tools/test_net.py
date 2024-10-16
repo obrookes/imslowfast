@@ -153,7 +153,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                     cfg.SOLVER.MAX_EPOCH,
                 )
                 preds = model(inputs, alpha_scheduler[epoch])
-
+            elif cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE:
+                preds = model(inputs)
             else:
                 out = model(inputs)
         else:
@@ -162,6 +163,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
 
         # all_preds.append(preds)
         if cfg.FG_BG_MIXUP.ENABLE:
+            all_names.extend(meta["fg_video_name"])
+        elif cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE:
             all_names.extend(meta["fg_video_name"])
         else:
             all_names.extend(meta["video_name"])
@@ -173,6 +176,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                 all_cas.append(cas)
                 all_preds.append(preds)
             elif cfg.FG_BG_MIXUP.ENABLE:
+                all_preds.append(preds)
+            elif cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE:
                 all_preds.append(preds)
             else:
                 preds, feats = out[0], out[1]
@@ -237,7 +242,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                 test_meter,
                 all_names,
                 all_preds,
-                torch.cat(all_feats, dim=0),
+                None if all_feats == [] else torch.cat(all_feats, dim=0),
                 all_labels,
             )
     else:
@@ -392,7 +397,8 @@ def test(cfg):
         result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
 
         result_string = (
-            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}" "".format(
+            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
+            "".format(
                 params / 1e6,
                 flops,
                 view,

@@ -1786,7 +1786,9 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = []  # Don't modify x list in place due to activation checkpoint.
+                            y = (
+                                []
+                            )  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -2332,12 +2334,12 @@ class DualResNetFGBG(nn.Module):
         width_per_group = cfg.RESNET.WIDTH_PER_GROUP
         dim_inner = num_groups * width_per_group
 
-        fg_model = ResNet(cfg)
-        bg_model = ResNet(cfg)
+        self.fg_model = ResNet(cfg)
+        self.bg_model = ResNet(cfg)
 
         cu.load_checkpoint(
             cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
-            fg_model,
+            self.fg_model,
             False,
             None,
             inflation=False,
@@ -2346,66 +2348,70 @@ class DualResNetFGBG(nn.Module):
 
         cu.load_checkpoint(
             cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
-            bg_model,
+            self.bg_model,
             False,
             None,
             inflation=False,
             convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
         )
 
-        self.bg_model_s1 = bg_model.s1
-        self.bg_model_s2 = bg_model.s2
-        self.bg_model_s3 = bg_model.s3
-        self.bg_model_s4 = bg_model.s4
-        self.bg_model_s5 = bg_model.s5
+        # self.bg_model_s1 = bg_model.s1
+        # self.bg_model_s2 = bg_model.s2
+        # self.bg_model_s3 = bg_model.s3
+        # self.bg_model_s4 = bg_model.s4
+        # self.bg_model_s5 = bg_model.s5
 
-        self.fg_model_s1 = fg_model.s1
-        self.fg_model_s2 = fg_model.s2
-        self.fg_model_s3 = fg_model.s3
-        self.fg_model_s4 = fg_model.s4
-        self.fg_model_s5 = fg_model.s5
+        # self.fg_model_s1 = fg_model.s1
+        # self.fg_model_s2 = fg_model.s2
+        # self.fg_model_s3 = fg_model.s3
+        # self.fg_model_s4 = fg_model.s4
+        # self.fg_model_s5 = fg_model.s5
 
-        self.linear_1 = nn.Linear(2 * cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM)  #
-        self.linear_2 = nn.Linear(cfg.MODEL.HEAD_MLP_DIM, cfg.MODEL.HEAD_MLP_DIM // 2)
-        self.linear_3 = nn.Linear(
-            cfg.MODEL.HEAD_MLP_DIM // 2, cfg.MODEL.HEAD_MLP_DIM // 4
-        )
-        self.projection = nn.Linear(cfg.MODEL.HEAD_MLP_DIM // 4, cfg.MODEL.NUM_CLASSES)
+        self.linear_1 = nn.Linear(2 * cfg.MODEL.NUM_CLASSES, 2 * cfg.MODEL.NUM_CLASSES)
+        self.linear_2 = nn.Linear(2 * cfg.MODEL.NUM_CLASSES, 2 * cfg.MODEL.NUM_CLASSES)
+        self.linear_3 = nn.Linear(2 * cfg.MODEL.NUM_CLASSES, 2 * cfg.MODEL.NUM_CLASSES)
+        self.projection = nn.Linear(2 * cfg.MODEL.NUM_CLASSES, cfg.MODEL.NUM_CLASSES)
 
     def forward(self, x, alpha=0.0):
-        self.bg_model_s1.requires_grad = False
-        self.bg_model_s2.requires_grad = False
-        self.bg_model_s3.requires_grad = False
-        self.bg_model_s4.requires_grad = False
-        self.bg_model_s5.requires_grad = False
+        # self.bg_model_s1.requires_grad = False
+        # self.bg_model_s2.requires_grad = False
+        # self.bg_model_s3.requires_grad = False
+        # self.bg_model_s4.requires_grad = False
+        # self.bg_model_s5.requires_grad = False
 
-        self.fg_model_s1.requires_grad = False
-        self.fg_model_s2.requires_grad = False
-        self.fg_model_s3.requires_grad = False
-        self.fg_model_s4.requires_grad = False
-        self.fg_model_s5.requires_grad = False
+        # self.fg_model_s1.requires_grad = False
+        # self.fg_model_s2.requires_grad = False
+        # self.fg_model_s3.requires_grad = False
+        # self.fg_model_s4.requires_grad = False
+        # self.fg_model_s5.requires_grad = False
 
-        bg_model_output = self.bg_model_s5(
-            self.bg_model_s4(
-                self.bg_model_s3(
-                    self.bg_model_s2(self.bg_model_s1([x["fg_frames"][0]]))
-                )
-            )
-        )[0]
+        self.fg_model.requires_grad = False
+        self.bg_model.requires_grad = False
 
-        fg_model_output = self.fg_model_s5(
-            self.fg_model_s4(
-                self.fg_model_s3(
-                    self.fg_model_s2(self.fg_model_s1([x["fg_frames"][0]]))
-                )
-            )
-        )[0]
+        # bg_model_output = self.bg_model_s5(
+        #     self.bg_model_s4(
+        #         self.bg_model_s3(
+        #             self.bg_model_s2(self.bg_model_s1([x["fg_frames"][0]]))
+        #         )
+        #     )
+        # )[0]
 
-        fg_model_output = F.adaptive_avg_pool3d(fg_model_output, (1, 1, 1))
-        bg_model_output = F.adaptive_avg_pool3d(bg_model_output, (1, 1, 1))
+        # fg_model_output = self.fg_model_s5(
+        #     self.fg_model_s4(
+        #         self.fg_model_s3(
+        #             self.fg_model_s2(self.fg_model_s1([x["fg_frames"][0]]))
+        #         )
+        #     )
+        # )[0]
+
+        fg_model_output = self.fg_model([x["fg_frames"][0]])
+        bg_model_output = self.bg_model([x["bg_frames"][0]])
+
+        # fg_model_output = F.adaptive_avg_pool3d(fg_model_output, (1, 1, 1))
+        # bg_model_output = F.adaptive_avg_pool3d(bg_model_output, (1, 1, 1))
 
         x = torch.concat([fg_model_output, bg_model_output], dim=1)
-        x = torch.flatten(x, 1)
+        # x = torch.flatten(x, 1)
 
         x = self.linear_1(x)
         x = F.relu(x)
