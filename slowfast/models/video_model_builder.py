@@ -1786,9 +1786,7 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = (
-                                []
-                            )  # Don't modify x list in place due to activation checkpoint.
+                            y = []  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -2015,6 +2013,9 @@ class ResNetFGBGConcat(nn.Module):
         self.num_pathways = 1
         self.concat_bg_frames = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE
         self.concat_bg_frames_ratio = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO
+        self.sort_bg_frames = (
+            cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.SORT_BG_FRAMES
+        )  # whether to sort all bg frames or only remainder frames, default is False
 
         self._construct_network(cfg)
         init_helper.init_weights(
@@ -2208,6 +2209,7 @@ class ResNetFGBGConcat(nn.Module):
 
     def forward(self, x, alpha=0.0):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
+
         if self.training:
             if self.concat_bg_frames and self.concat_bg_frames_ratio > 0.0:
                 # select random bg frames
@@ -2234,15 +2236,27 @@ class ResNetFGBGConcat(nn.Module):
                     remainder_indices = torch.randperm(bg_frames.shape[2])[
                         :frames_remainder
                     ]
-                    # sort indices
-                    remainder_indices = torch.sort(remainder_indices).values
 
-                    indices = torch.cat(
-                        [
-                            indices,
-                            remainder_indices,
-                        ]
-                    )
+                    if self.sort_bg_frames:
+                        indices = torch.cat(
+                            [
+                                indices,
+                                remainder_indices,
+                            ]
+                        )
+                        # sort all indices
+                        indices = torch.sort(indices).values
+
+                    else:
+                        # sort only the remainder_indices
+                        remainder_indices = torch.sort(remainder_indices).values
+
+                        indices = torch.cat(
+                            [
+                                indices,
+                                remainder_indices,
+                            ]
+                        )
 
                 selected_bg_frames = bg_frames[:, :, indices, :, :]
 

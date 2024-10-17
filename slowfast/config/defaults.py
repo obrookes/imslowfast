@@ -957,6 +957,8 @@ _C.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE = False
 # 1.0 - concat all frames of bg video
 _C.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO = 1.0
 
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.SORT_BG_FRAMES = False
+
 
 # ---------------------------------------------------------------------------- #
 # FG-FG Mixup options
