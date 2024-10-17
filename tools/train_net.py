@@ -207,7 +207,12 @@ def train_epoch(
 
             # Forward pass model
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                (model, preds, partial_loss, perform_backward,) = contrastive_forward(
+                (
+                    model,
+                    preds,
+                    partial_loss,
+                    perform_backward,
+                ) = contrastive_forward(
                     model, cfg, inputs, index, time, epoch_exact, scaler
                 )
             elif cfg.DETECTION.ENABLE:
@@ -977,7 +982,7 @@ def train(cfg):
 
         # Train for one epoch.
         epoch_timer.epoch_tic()
-        if alpha_scheduler:
+        if alpha_scheduler is not None:
             alpha = alpha_scheduler[cur_epoch]
         else:
             alpha = 0.0
