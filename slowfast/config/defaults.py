@@ -959,6 +959,7 @@ _C.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO = 1.0
 
 _C.FG_BG_MIXUP.CONCAT_BG_FRAMES.SORT_BG_FRAMES = False
 
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.SUBSAMPLE_CONCAT_FRAMES = False
 
 # ---------------------------------------------------------------------------- #
 # FG-FG Mixup options

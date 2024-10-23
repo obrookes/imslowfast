@@ -1786,7 +1786,9 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = []  # Don't modify x list in place due to activation checkpoint.
+                            y = (
+                                []
+                            )  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -2016,6 +2018,9 @@ class ResNetFGBGConcat(nn.Module):
         self.sort_bg_frames = (
             cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.SORT_BG_FRAMES
         )  # whether to sort all bg frames or only remainder frames, default is False
+        self.subsample_concat_frames = (
+            cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.SUBSAMPLE_CONCAT_FRAMES
+        )
 
         self._construct_network(cfg)
         init_helper.init_weights(
@@ -2207,6 +2212,59 @@ class ResNetFGBGConcat(nn.Module):
 
         self.projection = self.head.projection
 
+    def sample_consecutive_frames(self, video_tensor, num_frames):
+        """
+        Sample N consecutive frames from a video tensor.
+
+        Args:
+            video_tensor (torch.Tensor): Video tensor of shape [B, C, T, H, W]
+            num_frames (int): Number of consecutive frames to sample
+            random_start (bool): If True, randomly select starting frame. If False, start from frame 0
+
+        Returns:
+            torch.Tensor: Sampled frames of shape [B, C, N, H, W]
+        """
+        batch_size, channels, total_frames, height, width = video_tensor.shape
+
+        # Ensure we don't sample more frames than available
+        if num_frames > total_frames:
+            raise ValueError(
+                f"Requested {num_frames} frames but video only has {total_frames} frames"
+            )
+
+        # Calculate the maximum possible starting index
+        max_start_idx = total_frames - num_frames
+
+        if max_start_idx < 0:
+            raise ValueError(
+                "Not enough frames in video to sample the requested number of consecutive frames"
+            )
+
+        # Get starting indices for each batch
+        start_indices = torch.randint(0, max_start_idx + 1, (batch_size,))
+
+        # Create frame indices for each batch
+        batch_indices = []
+        for batch_idx in range(batch_size):
+            start_idx = start_indices[batch_idx]
+            frame_indices = torch.arange(start_idx, start_idx + num_frames)
+            batch_indices.append(frame_indices)
+
+        # Stack the indices for all batches
+        batch_indices = torch.stack(batch_indices)
+
+        # Create indexing tensors
+        batch_idx = torch.arange(batch_size).view(-1, 1).expand(-1, num_frames)
+        frame_idx = batch_indices
+
+        # Sample the frames
+        # Need to handle the channel dimension differently now
+        sampled_frames = torch.stack(
+            [video_tensor[b, :, frame_idx[b]] for b in range(batch_size)]
+        )
+
+        return sampled_frames
+
     def forward(self, x, alpha=0.0):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
 
@@ -2270,6 +2328,12 @@ class ResNetFGBGConcat(nn.Module):
                 )
 
                 assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
+
+                # If subsample concatenated frames
+                if self.subsample_concat_frames:
+                    concat_frames = self.sample_consecutive_frames(
+                        concat_frames, self.cfg.DATA.NUM_FRAMES
+                    )
 
                 x["fg_frames"][0] = concat_frames
 
