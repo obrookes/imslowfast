@@ -158,6 +158,10 @@ def _get_model_analysis_input(cfg, use_train_input):
             "mask": torch.ones(1),
             "utm": torch.ones(1),
         }
+    elif cfg.TRAIN.DATASET == "bkinetics":
+        inputs = {
+            "concat_frames": model_inputs,
+        }
     elif cfg.FGFG_MIXUP.ENABLE:
         inputs = {
             "f1": model_inputs,

@@ -179,11 +179,18 @@ def train_epoch(
             )
         except:
             try:
-                batch_size = (
-                    inputs["fg_frames"][0].size(0)
-                    if isinstance(inputs, dict)
-                    else inputs["fg_frames"].size(0)
-                )
+                try:
+                    batch_size = (
+                        inputs["fg_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+                except:
+                    batch_size = (
+                        inputs["concat_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
             except:
                 batch_size = (
                     inputs["f1"][0].size(0)
@@ -574,11 +581,18 @@ def eval_epoch(
             )
         except:
             try:
-                batch_size = (
-                    inputs["fg_frames"][0].size(0)
-                    if isinstance(inputs, dict)
-                    else inputs["fg_frames"].size(0)
-                )
+                try:
+                    batch_size = (
+                        inputs["fg_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+                except:
+                    batch_size = (
+                        inputs["concat_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
             except:
                 batch_size = (
                     inputs["f1"][0].size(0)

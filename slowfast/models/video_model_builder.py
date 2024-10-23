@@ -2212,136 +2212,8 @@ class ResNetFGBGConcat(nn.Module):
 
         self.projection = self.head.projection
 
-    def sample_consecutive_frames(self, video_tensor, num_frames):
-        """
-        Sample N consecutive frames from a video tensor.
-
-        Args:
-            video_tensor (torch.Tensor): Video tensor of shape [B, C, T, H, W]
-            num_frames (int): Number of consecutive frames to sample
-            random_start (bool): If True, randomly select starting frame. If False, start from frame 0
-
-        Returns:
-            torch.Tensor: Sampled frames of shape [B, C, N, H, W]
-        """
-        batch_size, channels, total_frames, height, width = video_tensor.shape
-
-        # Ensure we don't sample more frames than available
-        if num_frames > total_frames:
-            raise ValueError(
-                f"Requested {num_frames} frames but video only has {total_frames} frames"
-            )
-
-        # Calculate the maximum possible starting index
-        max_start_idx = total_frames - num_frames
-
-        if max_start_idx < 0:
-            raise ValueError(
-                "Not enough frames in video to sample the requested number of consecutive frames"
-            )
-
-        # Get starting indices for each batch
-        start_indices = torch.randint(0, max_start_idx + 1, (batch_size,))
-
-        # Create frame indices for each batch
-        batch_indices = []
-        for batch_idx in range(batch_size):
-            start_idx = start_indices[batch_idx]
-            frame_indices = torch.arange(start_idx, start_idx + num_frames)
-            batch_indices.append(frame_indices)
-
-        # Stack the indices for all batches
-        batch_indices = torch.stack(batch_indices)
-
-        # Create indexing tensors
-        batch_idx = torch.arange(batch_size).view(-1, 1).expand(-1, num_frames)
-        frame_idx = batch_indices
-
-        # Sample the frames
-        # Need to handle the channel dimension differently now
-        sampled_frames = torch.stack(
-            [video_tensor[b, :, frame_idx[b]] for b in range(batch_size)]
-        )
-
-        return sampled_frames
-
     def forward(self, x, alpha=0.0):
-        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
-
-        if self.training:
-            if self.concat_bg_frames and self.concat_bg_frames_ratio > 0.0:
-                # select random bg frames
-                bg_frames = x["bg_frames"][0]
-                fg_frames = x["fg_frames"][0]
-
-                # take a random subset of bg_frames using concat_bg_frames_ratio
-                num_bg_frames = int(bg_frames.shape[2] * self.concat_bg_frames_ratio)
-
-                frames_quotient = num_bg_frames // bg_frames.shape[2]
-                frames_remainder = num_bg_frames % bg_frames.shape[2]
-
-                if frames_quotient > 0:
-                    indices = torch.cat(
-                        [
-                            torch.arange(bg_frames.shape[2])
-                            for _ in range(frames_quotient)
-                        ]
-                    )
-                else:
-                    indices = torch.tensor([], dtype=torch.int32)
-
-                if frames_remainder > 0:
-                    remainder_indices = torch.randperm(bg_frames.shape[2])[
-                        :frames_remainder
-                    ]
-
-                    if self.sort_bg_frames:
-                        indices = torch.cat(
-                            [
-                                indices,
-                                remainder_indices,
-                            ]
-                        )
-                        # sort all indices
-                        indices = torch.sort(indices).values
-
-                    else:
-                        # sort only the remainder_indices
-                        remainder_indices = torch.sort(remainder_indices).values
-
-                        indices = torch.cat(
-                            [
-                                indices,
-                                remainder_indices,
-                            ]
-                        )
-
-                selected_bg_frames = bg_frames[:, :, indices, :, :]
-
-                # concatenate bg_frames to fg_frames
-                concat_frames = torch.cat(
-                    [
-                        fg_frames,
-                        selected_bg_frames,
-                    ],
-                    dim=2,
-                )
-
-                assert concat_frames.shape[2] == fg_frames.shape[2] + num_bg_frames
-
-                # If subsample concatenated frames
-                if self.subsample_concat_frames:
-                    concat_frames = self.sample_consecutive_frames(
-                        concat_frames, self.cfg.DATA.NUM_FRAMES
-                    )
-
-                x["fg_frames"][0] = concat_frames
-
-        # x should only contain fg_frames
-        x = {
-            "fg_frames": x["fg_frames"],
-        }
-
+        emb_dict = {}  # concat_frames
         for k, v in x.items():
             x = v[:]  # avoid pass by reference
             x = self.s1(x)
@@ -2358,7 +2230,7 @@ class ResNetFGBGConcat(nn.Module):
             x = torch.flatten(x, 1)
             emb_dict[k] = x
 
-        embs = emb_dict["fg_frames"]
+        embs = emb_dict["concat_frames"]
         x = self.projection(embs)
 
         return x
