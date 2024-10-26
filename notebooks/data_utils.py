@@ -32,20 +32,17 @@ def results2df(train_data, val_data, metadata_df, right_on="subject_id"):
     # Process subclips
     subclips = []
     for i, split in enumerate([train_data, val_data]):
-        for name, pred, feat, label in zip(
-            split["names"], split["preds"], split["feats"], split["labels"]
-        ):
+        for name, pred, label in zip(split["names"], split["preds"], split["labels"]):
             subclips.append(
                 {
                     "name": name,
                     "split": i,
                     "pred": pred,
-                    "feat": feat,
                     "negative": True if sum(label) == 0 else False,
                 }
             )
 
-    df = pd.DataFrame(subclips, columns=["name", "split", "pred", "feat", "negative"])
+    df = pd.DataFrame(subclips, columns=["name", "split", "pred", "negative"])
 
     df["split"] = df.split.map({0: "train", 1: "val"})
     df = df.merge(metadata_df, how="left", left_on="name", right_on=right_on)
