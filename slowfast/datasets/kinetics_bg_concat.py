@@ -686,7 +686,7 @@ class Bkinetics(torch.utils.data.Dataset):
                             :frames_remainder
                         ]
 
-                        if self.sort_bg_frames:
+                        if self.cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.SORT_BG_FRAMES:
                             indices = torch.cat(
                                 [
                                     indices,
