@@ -1800,6 +1800,8 @@ class ResNetFGBGMixup(nn.Module):
                             x = torch.flatten(x, 1)
                             emb_dict[k] = x
                     else:
+                        if (k == "bg2_frames") and (self.add_bg2 == False):
+                            continue
                         x = v[:]
                         x = self.s1(x)
                         x = self.s2(x)
@@ -1877,6 +1879,9 @@ class ResNetFGBGMixup(nn.Module):
                 return x, loss_ortho
 
             else:
+                if self.add_bg2 == False:
+                    emb_dict["bg2_frames"] = None
+
                 # Mix embeddings based on the batch
                 embs = self.mix_fg_bg(
                     emb_dict["fg_frames"],
