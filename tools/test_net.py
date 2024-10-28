@@ -379,7 +379,8 @@ def test(cfg):
     # Save the output features
     if cfg.TEST.RETURN_FEATS or (cfg.TAP.ENABLE and cfg.TEST.RETURN_CAS):
         save_path = os.path.join(
-            cfg.OUTPUT_DIR, f"{cfg.OUTPUT_DIR.split('/')[-1]}_feats.pkl"
+            cfg.OUTPUT_DIR,
+            f"{cfg.OUTPUT_DIR.split('/')[-1]}_e{checkpoint['epoch']+1}_feats.pkl",
         )
         if du.is_root_proc():
             with pathmgr.open(save_path, "wb") as f:
