@@ -744,6 +744,9 @@ class Bkinetics(torch.utils.data.Dataset):
 
             inputs = {
                 "concat_frames": [fg_frames],
+                "bg_frames": [bg_frames],
+                "mask": negative,
+                "utm": utm,
             }
             meta = {
                 "fg_video_name": self._path_to_fg_videos[index].split("/")[-1],
