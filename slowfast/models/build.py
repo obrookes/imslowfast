@@ -74,6 +74,7 @@ def build_model(cfg, gpu_id=None):
                 True
                 if cfg.MODEL.DETACH_FINAL_FC
                 or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                or cfg.MODEL.MODEL_NAME == "DualResNetFGBG"
                 else False
             ),
         )

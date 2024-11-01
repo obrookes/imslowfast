@@ -1001,6 +1001,57 @@ def train(cfg):
         else:
             alpha = 0.0
 
+        if cfg.MODEL.MODEL_NAME == "DualResNetFGBG":
+            if hasattr(model.module, "fg_model") and hasattr(model.module, "bg_model"):
+                print("Loading FG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.module.fg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+                print("Loading BG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.module.bg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+            else:
+                print("Loading FG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.fg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+                print("Loading BG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.bg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
         train_epoch(
             train_loader,
             model,
@@ -1070,7 +1121,6 @@ def train(cfg):
             )
         # Evaluate the model on validation set.
         if is_eval_epoch:
-
             alpha_scheduler_value = (
                 alpha_scheduler[cur_epoch] if alpha_scheduler is not None else 0.0
             )

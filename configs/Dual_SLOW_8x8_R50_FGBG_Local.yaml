@@ -1,12 +1,12 @@
 TRAIN:
   ENABLE: True
   DATASET: nkinetics
-  BATCH_SIZE: 2
+  BATCH_SIZE: 16
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
-  BG_MODEL_CHECKPOINT_FILE_PATH:  /home/kukushkin/imslowfast/results_dir/model=slow_r50_bg-only_rm-bg_e300.pyth
+  BG_MODEL_CHECKPOINT_FILE_PATH:  /mnt/imslowfast/results_dir/model=slow_r50_bg-only_rm-bg_e300.pyth
   BG_MODEL_CHECKPOINT_TYPE: pytorch
-  FG_MODEL_CHECKPOINT_FILE_PATH:  /home/kukushkin/imslowfast/results_dir/model=slow_r50_baseline_e300.pyth
+  FG_MODEL_CHECKPOINT_FILE_PATH:  /mnt/imslowfast/results_dir/model=slow_r50_baseline_e300.pyth
   FG_MODEL_CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
   MIXED_PRECISION: True
@@ -17,8 +17,8 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/kukushkin/imslowfast/dataset/annotations/full_data
-  PATH_PREFIX: /home/kukushkin/imslowfast/dataset/videos
+  PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/full_data
+  PATH_PREFIX: /mnt/imslowfast/dataset/videos
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
   TARGET_FPS: 24
@@ -71,7 +71,7 @@ TEST:
   #CHECKPOINT_FILE_PATH: weights/best_ckpt.pyth
   #CHECKPOINT_TYPE: pytorch
   DATASET: nkinetics
-  BATCH_SIZE: 2
+  BATCH_SIZE: 16
   RETURN_FEATS: False
 DATA_LOADER:
   NUM_WORKERS: 4
@@ -80,4 +80,4 @@ NUM_GPUS: 2
 NUM_SHARDS: 1
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: /home/kukushkin/imslowfast/results/model=dual_slow_r50_fgbg
+OUTPUT_DIR: /mnt/imslowfast/results/model=dual_slow_r50_fgbg_test_fg_bg1
