@@ -1582,6 +1582,7 @@ class ResNetFGBGMixup(nn.Module):
         self.add_bg2 = cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
         self.concat_bg_frames = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE
         self.concat_bg_frames_ratio = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO
+        self.dataset = cfg.TRAIN.DATASET
 
         self._construct_network(cfg)
         init_helper.init_weights(
@@ -1775,6 +1776,16 @@ class ResNetFGBGMixup(nn.Module):
 
     def forward(self, x, alpha=0.0, beta=None, labels=None):
         emb_dict = {}  # fg_frames, bg_frames, bg_frames2
+
+        if self.dataset == "bkinetics":
+            # Assert keys are 'concat_frames', and 'bg_frames'
+            assert (
+                "concat_frames" in x.keys() and "bg_frames" in x.keys()
+            ), f"Keys: {x.keys()}"
+
+            # Rename 'concat_frames' to 'fg_frames'
+            x["fg_frames"] = x.pop("concat_frames")
+
         mask = x["mask"]
 
         for k, v in x.items():
