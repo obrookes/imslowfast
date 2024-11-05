@@ -1,6 +1,6 @@
 TRAIN:
   ENABLE: True
-  DATASET: nkinetics
+  DATASET: kinetics
   BATCH_SIZE: 8
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 10
@@ -15,7 +15,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/full_data
+  PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/standard
   PATH_PREFIX: /mnt/imslowfast/dataset/videos
   TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
@@ -91,7 +91,7 @@ MODEL:
   DROPOUT_RATE: 0.5
 TEST:
   ENABLE: True
-  DATASET: nkinetics
+  DATASET: kinetics
   BATCH_SIZE: 8
   NUM_SPATIAL_CROPS: 1
 DATA_LOADER:
