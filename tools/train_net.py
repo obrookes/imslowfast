@@ -1002,7 +1002,7 @@ def train(cfg):
             alpha = 0.0
 
         if cfg.MODEL.MODEL_NAME == "DualResNetFGBG":
-            if hasattr(model.module, "fg_model") and hasattr(model.module, "bg_model"):
+            if cfg.NUM_GPUS > 1:
                 print("Loading FG model")
                 cu.load_checkpoint(
                     cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
