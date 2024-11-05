@@ -3130,82 +3130,87 @@ class MViT(nn.Module):
         return x
 
     def forward(self, x, bboxes=None, return_attn=False):
-        x = x[0]
-        x, bcthw = self.patch_embed(x)
-        bcthw = list(bcthw)
-        if len(bcthw) == 4:  # Fix bcthw in case of 4D tensor
-            bcthw.insert(2, torch.tensor(self.T))
-        T, H, W = bcthw[-3], bcthw[-2], bcthw[-1]
-        assert len(bcthw) == 5 and (T, H, W) == (self.T, self.H, self.W), bcthw
-        B, N, C = x.shape
+        for k, v in x.items():
+            if (k != "mask") and (k != "utm"):
+                x = v[:]
+                x, bcthw = self.patch_embed(x[0])
+                bcthw = list(bcthw)
+                if len(bcthw) == 4:  # Fix bcthw in case of 4D tensor
+                    bcthw.insert(2, torch.tensor(self.T))
+                T, H, W = bcthw[-3], bcthw[-2], bcthw[-1]
+                assert len(bcthw) == 5 and (T, H, W) == (self.T, self.H, self.W), bcthw
+                B, N, C = x.shape
 
-        s = 1 if self.cls_embed_on else 0
-        if self.use_fixed_sincos_pos:
-            x += self.pos_embed[:, s:, :]  # s: on/off cls token
+                s = 1 if self.cls_embed_on else 0
+                if self.use_fixed_sincos_pos:
+                    x += self.pos_embed[:, s:, :]  # s: on/off cls token
 
-        if self.cls_embed_on:
-            cls_tokens = self.cls_token.expand(
-                B, -1, -1
-            )  # stole cls_tokens impl from Phil Wang, thanks
-            if self.use_fixed_sincos_pos:
-                cls_tokens = cls_tokens + self.pos_embed[:, :s, :]
-            x = torch.cat((cls_tokens, x), dim=1)
-
-        if self.use_abs_pos:
-            if self.sep_pos_embed:
-                pos_embed = self.pos_embed_spatial.repeat(
-                    1, self.patch_dims[0], 1
-                ) + torch.repeat_interleave(
-                    self.pos_embed_temporal,
-                    self.patch_dims[1] * self.patch_dims[2],
-                    dim=1,
-                )
                 if self.cls_embed_on:
-                    pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
-                x += self._get_pos_embed(pos_embed, bcthw)
-            else:
-                x += self._get_pos_embed(self.pos_embed, bcthw)
+                    cls_tokens = self.cls_token.expand(
+                        B, -1, -1
+                    )  # stole cls_tokens impl from Phil Wang, thanks
+                    if self.use_fixed_sincos_pos:
+                        cls_tokens = cls_tokens + self.pos_embed[:, :s, :]
+                    x = torch.cat((cls_tokens, x), dim=1)
 
-        if self.drop_rate:
-            x = self.pos_drop(x)
+                if self.use_abs_pos:
+                    if self.sep_pos_embed:
+                        pos_embed = self.pos_embed_spatial.repeat(
+                            1, self.patch_dims[0], 1
+                        ) + torch.repeat_interleave(
+                            self.pos_embed_temporal,
+                            self.patch_dims[1] * self.patch_dims[2],
+                            dim=1,
+                        )
+                        if self.cls_embed_on:
+                            pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
+                        x += self._get_pos_embed(pos_embed, bcthw)
+                    else:
+                        x += self._get_pos_embed(self.pos_embed, bcthw)
 
-        if self.norm_stem:
-            x = self.norm_stem(x)
+                if self.drop_rate:
+                    x = self.pos_drop(x)
 
-        thw = [T, H, W]
+                if self.norm_stem:
+                    x = self.norm_stem(x)
 
-        if self.enable_rev:
-            x = self._forward_reversible(x)
+                thw = [T, H, W]
+
+                if self.enable_rev:
+                    x = self._forward_reversible(x)
+
+                else:
+                    for blk in self.blocks:
+                        x, thw = blk(x, thw)
+
+                    if self.enable_detection:
+                        assert not self.enable_rev
+
+                        x = self.norm(x)
+                        if self.cls_embed_on:
+                            x = x[:, 1:]
+
+                        B, _, C = x.shape
+                        x = x.transpose(1, 2).reshape(B, C, thw[0], thw[1], thw[2])
+
+                    else:
+                        if self.use_mean_pooling:
+                            if self.cls_embed_on:
+                                x = x[:, 1:]
+                            x = x.mean(1)
+                            x = self.norm(x)
+                        elif self.cls_embed_on:
+                            x = self.norm(x)
+                            x = x[:, 0]
+                        else:  # this is default, [norm->mean]
+                            x = self.norm(x)
+                            x = x.mean(1)
+
+        if self.enable_detection:
+            x = self.head(x, bboxes)
 
         else:
-            for blk in self.blocks:
-                x, thw = blk(x, thw)
-
-            if self.enable_detection:
-                assert not self.enable_rev
-
-                x = self.norm(x)
-                if self.cls_embed_on:
-                    x = x[:, 1:]
-
-                B, _, C = x.shape
-                x = x.transpose(1, 2).reshape(B, C, thw[0], thw[1], thw[2])
-
-                x = self.head([x], bboxes)
-
-            else:
-                if self.use_mean_pooling:
-                    if self.cls_embed_on:
-                        x = x[:, 1:]
-                    x = x.mean(1)
-                    x = self.norm(x)
-                elif self.cls_embed_on:
-                    x = self.norm(x)
-                    x = x[:, 0]
-                else:  # this is default, [norm->mean]
-                    x = self.norm(x)
-                    x = x.mean(1)
-                x = self.head(x)
+            x = self.head(x)
 
         return x
 

@@ -31,7 +31,7 @@ TAP:
   ENABLE: False
 TENSORBOARD:
   ENABLE: True
-  LOG_DIR: mvit2_base
+  LOG_DIR: mvit2_base_conv_concat
 MVIT:
   ZERO_DECAY_POS_CLS: False
   USE_ABS_POS: False
@@ -59,7 +59,7 @@ MVIT:
   RESIDUAL_POOLING: True
 AUG:
   NUM_SAMPLE: 1
-  ENABLE: false
+  ENABLE: False
   COLOR_JITTER: 0.4
   AA_TYPE: rand-m7-n4-mstd0.5-inc1
   INTERPOLATION: bicubic
