@@ -1,15 +1,19 @@
 TRAIN:
   ENABLE: True
-  DATASET: nkinetics
-  BATCH_SIZE: 16
+  DATASET: bkinetics
+  BATCH_SIZE: 8
   EVAL_PERIOD: 1
-  CHECKPOINT_PERIOD: 1
-  BG_MODEL_CHECKPOINT_FILE_PATH:  /mnt/imslowfast/results_dir/model=slow_r50_bg-only_rm-bg_e300.pyth
-  BG_MODEL_CHECKPOINT_TYPE: pytorch
-  FG_MODEL_CHECKPOINT_FILE_PATH:  /mnt/imslowfast/results_dir/model=slow_r50_baseline_e300.pyth
-  FG_MODEL_CHECKPOINT_TYPE: pytorch
-  AUTO_RESUME: False
+  CHECKPOINT_PERIOD: 25
+  CHECKPOINT_FILE_PATH: /mnt/imslowfast/projects/slow/SLOWONLY_8x8_R50.pkl
+  CHECKPOINT_TYPE: caffe2
   MIXED_PRECISION: True
+  AUTO_RESUME: True
+TEST:
+  ENABLE: False
+  DATASET: nkinetics
+  BATCH_SIZE: 8
+  NUM_ENSEMBLE_VIEWS: 1
+  NUM_SPATIAL_CROPS: 1
 DATA:
   NUM_FRAMES: 16
   SAMPLING_RATE: 24
@@ -21,15 +25,22 @@ DATA:
   PATH_PREFIX: /mnt/imslowfast/dataset/videos
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
+  SPATIAL_SAMPLING: False
   TARGET_FPS: 24
-  #USE_MEAN: True
-AUG:
-  ENABLE: False
 FG_BG_MIXUP:
   ENABLE: True
   CONCAT_BG_FRAMES:
     ENABLE: True
-    RATIO: 0.5
+    RATIO: 0.0 # NUM_FRAMES + 0.0 * NUM_FRAMES
+    SUBSAMPLE_CONCAT_FRAMES: True
+  SUBTRACT_BG:
+    ENABLE: True
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+    SCHEDULER: linear
+  MIX_ON_EVAL: True
+AUG:
+  ENABLE: False
 TENSORBOARD:
   ENABLE: True
 RESNET:
@@ -48,36 +59,27 @@ BN:
   USE_PRECISE_STATS: False
   NUM_BATCHES_PRECISE: 200
 SOLVER:
-  BASE_LR: 1e-1
+  BASE_LR: 2.5e-1
   LR_POLICY: cosine
-  MAX_EPOCH: 10
+  MAX_EPOCH: 300
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
-  WARMUP_EPOCHS: 1.0
-  WARMUP_START_LR: 1e-2
+  WARMUP_EPOCHS: 5.0
+  WARMUP_START_LR: 2.5e-2
   OPTIMIZING_METHOD: sgd
 MODEL:
   NUM_CLASSES: 14
   ARCH: slow
-  MODEL_NAME: DualResNetFGBG
+  MODEL_NAME: ResNetFGBGMixup
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
-  HEAD_MLP_DIM: 2048
-SAMPLING:
-  BALANCED: False
-TEST:
-  ENABLE: True
-  #CHECKPOINT_FILE_PATH: weights/best_ckpt.pyth
-  #CHECKPOINT_TYPE: pytorch
-  DATASET: nkinetics
-  BATCH_SIZE: 16
-  RETURN_FEATS: False
 DATA_LOADER:
   NUM_WORKERS: 4
   PIN_MEMORY: True
 NUM_GPUS: 2
 NUM_SHARDS: 1
+USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: /mnt/imslowfast/results/model=dual_slow_r50_fgbg_test_fg_bg
+OUTPUT_DIR: '/mnt/imslowfast/results/model=slow_r50_bg_concat=0.0_cropped_bg_sub'

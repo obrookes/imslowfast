@@ -1001,7 +1001,11 @@ def train(cfg):
         else:
             alpha = 0.0
 
-        if cfg.MODEL.MODEL_NAME == "DualResNetFGBG":
+        if (
+            cfg.MODEL.MODEL_NAME == "DualResNetFGBG"
+            or cfg.MODEL.MODEL_NAME == "DualMViTFGBG"
+        ):
+            # print("DualMViTFGBG")
             if cfg.NUM_GPUS > 1:
                 print("Loading FG model")
                 cu.load_checkpoint(
