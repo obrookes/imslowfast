@@ -24,7 +24,7 @@ DATA:
 FG_BG_MIXUP:
   ENABLE: True
   ADD_BG: 
-    ENABLE: False
+    ENABLE: True
     ALPHA_MIN: 0.0
     ALPHA_MAX: 1.0
   SUBTRACT_BG: 

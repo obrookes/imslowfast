@@ -1,6 +1,6 @@
 TRAIN:
   ENABLE: True
-  DATASET: bkinetics
+  DATASET: nkinetics
   BATCH_SIZE: 8
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
@@ -15,7 +15,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/full_data
+  PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/fgbgmixup
   PATH_PREFIX: /mnt/imslowfast/dataset/videos
   TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
@@ -28,11 +28,11 @@ FG_BG_MIXUP:
     RATIO: 1.0 # NUM_FRAMES + 1.0 * NUM_FRAMES
     SUBSAMPLE_CONCAT_FRAMES: True
   ADD_BG: 
-    ENABLE: True
+    ENABLE: False
     ALPHA_MIN: 0.0
     ALPHA_MAX: 1.0
   SUBTRACT_BG: 
-    ENABLE: True
+    ENABLE: False
     ALPHA_MIN: 0.0
     ALPHA_MAX: 1.0
     ORTHO_EMBS: False # use orthogonal embeddings for bg subtraction (and addition, when ADD_BG2 is enabled)
@@ -113,13 +113,13 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 14
   ARCH: mvit
-  MODEL_NAME: MViTFGBGConcat
+  MODEL_NAME: MViTFGBGMixup
   LOSS_FUNC: bce_logit
   HEAD_ACT: none
   DROPOUT_RATE: 0.5
 TEST:
   ENABLE: True
-  DATASET: bkinetics
+  DATASET: nkinetics
   BATCH_SIZE: 8
   NUM_SPATIAL_CROPS: 1
 DATA_LOADER:
