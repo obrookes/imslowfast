@@ -1,11 +1,11 @@
 TRAIN:
   ENABLE: True
-  DATASET: kinetics
+  DATASET: bkinetics
   BATCH_SIZE: 8
-  EVAL_PERIOD: 10
-  CHECKPOINT_PERIOD: 10
-  AUTO_RESUME: False
+  EVAL_PERIOD: 1
+  CHECKPOINT_PERIOD: 1
   MIXED_PRECISION: True
+  AUTO_RESUME: False
 DATA:
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
@@ -15,12 +15,42 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/standard
+  PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/full_data
   PATH_PREFIX: /mnt/imslowfast/dataset/videos
   TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
+FG_BG_MIXUP:
+  ENABLE: True
+  CONCAT_BG_FRAMES:
+    ENABLE: True
+    RATIO: 1.0 # NUM_FRAMES + 1.0 * NUM_FRAMES
+    SUBSAMPLE_CONCAT_FRAMES: True
+  ADD_BG: 
+    ENABLE: True
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+  SUBTRACT_BG: 
+    ENABLE: True
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+    ORTHO_EMBS: False # use orthogonal embeddings for bg subtraction (and addition, when ADD_BG2 is enabled)
+    SCHEDULER: exp  #linear, exp
+    APPLY_CLASSWISE: # apply bg subtraction for certain classes only
+      ENABLE: False
+      CLASSES: [0, 1, 3, 4, 5, 11, 12, 13] # provide a list of allowed labels, so forbidden labels are [2, 6, 7, 8, 9, 10] 
+  ADD_BG2: # add another background to the video
+    ENABLE: False
+    START_FROM_EPOCH: 0
+  SELECT_RAND_BG_FRAME:
+    ENABLE: False
+    DUPLICATE_FRAME: False
+TAP:
+  ENABLE: False
+TENSORBOARD:
+  ENABLE: True
+  LOG_DIR: mvit2_base_conv_concat
 MVIT:
   ZERO_DECAY_POS_CLS: False
   USE_ABS_POS: False
@@ -46,8 +76,6 @@ MVIT:
   DROPOUT_RATE: 0.0
   DIM_MUL_IN_ATT: True
   RESIDUAL_POOLING: True
-TAP:
-  ENABLE: False
 AUG:
   NUM_SAMPLE: 1
   ENABLE: False
@@ -85,13 +113,13 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 14
   ARCH: mvit
-  MODEL_NAME: MViT
+  MODEL_NAME: MViTFGBGConcat
   LOSS_FUNC: bce_logit
   HEAD_ACT: none
   DROPOUT_RATE: 0.5
 TEST:
   ENABLE: True
-  DATASET: kinetics
+  DATASET: bkinetics
   BATCH_SIZE: 8
   NUM_SPATIAL_CROPS: 1
 DATA_LOADER:
