@@ -15,7 +15,7 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: dataset/annotations/fgbgmixup
+  PATH_TO_DATA_DIR: data/annotations/fgbgmixup
   PATH_PREFIX: data/videos/cropped
   TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]

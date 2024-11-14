@@ -4,9 +4,9 @@ TRAIN:
   BATCH_SIZE: 16
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
-  BG_MODEL_CHECKPOINT_FILE_PATH:  weights/model=slow_r50_bg-only_rm-bg_e300.pyth
+  BG_MODEL_CHECKPOINT_FILE_PATH:  model=slow_r50_bg-only_rm-bg_e300.pyth
   BG_MODEL_CHECKPOINT_TYPE: pytorch
-  FG_MODEL_CHECKPOINT_FILE_PATH:  weights/model=slow_r50_baseline_e300.pyth
+  FG_MODEL_CHECKPOINT_FILE_PATH:  model=slow_r50_baseline_e300.pyth
   FG_MODEL_CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
   MIXED_PRECISION: True

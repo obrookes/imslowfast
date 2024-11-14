@@ -22,31 +22,11 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: data/annotations/fgbgmixup
-  PATH_PREFIX: data/videos/
+  PATH_TO_DATA_DIR: data/annotations/full_data
+  PATH_PREFIX: data/videos/cropped
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
   # DECODING_BACKEND: pyav #torchvision or pyav
-
-FG_BG_MIXUP:
-  ENABLE: True
-  ADD_BG: 
-    ENABLE: False
-    ALPHA_MIN: 0.0
-    ALPHA_MAX: 1.0
-  SUBTRACT_BG: 
-    ENABLE: True
-    ALPHA_MIN: 0.0
-    ALPHA_MAX: 1.0
-    ORTHO_EMBS: False # use orthogonal embeddings for bg subtraction (and addition, when ADD_BG2 is enabled)
-    SCHEDULER: exp  #linear, exp
-  ADD_BG2: # add another background to the video
-    ENABLE: True
-    START_FROM_EPOCH: 0
-  SELECT_RAND_BG_FRAME:
-    ENABLE: False
-    DUPLICATE_FRAME: False
-
 
 TENSORBOARD:
   ENABLE: False
@@ -112,4 +92,4 @@ NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: 'results/model=slow_r50_ds=panaf_seq_with_negatives-epoch=bgfgmixup'
+OUTPUT_DIR: 'results/model=slow_r50'
