@@ -30,3 +30,17 @@ To run experiments run e.g. for Dual_MVIT_B_16x4_BGFG_MIXUP model:
 ```bash
 python tools/run_net.py --cfg configs/Dual_MVIT_B_16x4_BGFG_MIXUP.yaml
 ```
+
+## Generate Synthetic Backgrounds
+* To generate synthetic background videos using Frame Difference run:
+```bash
+python bg_sub_fd.py
+```
+* To generate synthetic background videos using Gaussian Mixture Models run:
+```bash
+python bg_sub_gmm.py
+```
+* To generate synthetic background videos using SAM2 run:
+```bash
+python blabla.py
+```
