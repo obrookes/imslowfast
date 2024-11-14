@@ -1,23 +1,15 @@
 TRAIN:
   ENABLE: True
-  DATASET: bkinetics
-  BATCH_SIZE: 144
-  #BATCH_SIZE: 8
+  DATASET: nkinetics
+  BATCH_SIZE: 4
   EVAL_PERIOD: 1
-  CHECKPOINT_PERIOD: 25
-  CHECKPOINT_FILE_PATH: /mnt/imslowfast/MViTv2_S_16x4_k400_f302660347.pyth
-  #CHECKPOINT_FILE_PATH: /mnt/imslowfast/projects/mvitv2/MViTv2_S_16x4_k400.pyth
-  CHECKPOINT_TYPE: pytorch
-  CHECKPOINT_EPOCH_RESET: True
+  CHECKPOINT_PERIOD: 1
+  BG_MODEL_CHECKPOINT_FILE_PATH:  weights/mvit_bg-only_checkpoint_epoch_00200.pyth
+  BG_MODEL_CHECKPOINT_TYPE: pytorch
+  FG_MODEL_CHECKPOINT_FILE_PATH:  weights/mvit_fg-only_checkpoint_epoch_00200.pyth
+  FG_MODEL_CHECKPOINT_TYPE: pytorch
+  AUTO_RESUME: False
   MIXED_PRECISION: True
-  AUTO_RESUME: True
-TEST:
-  ENABLE: True
-  DATASET: bkinetics
-  BATCH_SIZE: 128
-  #BATCH_SIZE: 8
-  NUM_ENSEMBLE_VIEWS: 1
-  NUM_SPATIAL_CROPS: 1
 DATA:
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
@@ -27,28 +19,12 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /mnt/data/annotations/standard/foreground_background
-  PATH_PREFIX: /mnt/data/videos/cropped
-  #PATH_TO_DATA_DIR: /mnt/imslowfast/dataset/annotations/fgbgmixup
-  #PATH_PREFIX: /mnt/imslowfast/dataset/videos
+  PATH_TO_DATA_DIR: data/annotations/full_data
+  PATH_PREFIX: data/videos/cropped
   TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
-FG_BG_MIXUP:
-  ENABLE: True
-  CONCAT_BG_FRAMES:
-    ENABLE: True
-    RATIO: 32.0 # NUM_FRAMES + 1.0 * NUM_FRAMES
-    SUBSAMPLE_CONCAT_FRAMES: True
-  SUBTRACT_BG:
-    ENABLE: True
-    ALPHA_MIN: 0.0
-    ALPHA_MAX: 1.0
-    SCHEDULER: linear
-  MIX_ON_EVAL: True
-TENSORBOARD:
-  ENABLE: True
 MVIT:
   ZERO_DECAY_POS_CLS: False
   USE_ABS_POS: False
@@ -74,6 +50,8 @@ MVIT:
   DROPOUT_RATE: 0.0
   DIM_MUL_IN_ATT: True
   RESIDUAL_POOLING: True
+TAP:
+  ENABLE: False
 AUG:
   NUM_SAMPLE: 1
   ENABLE: False
@@ -104,24 +82,27 @@ SOLVER:
   WARMUP_START_LR: 1e-6
   WARMUP_EPOCHS: 30.0
   LR_POLICY: cosine
-  MAX_EPOCH: 300
+  MAX_EPOCH: 10
   MOMENTUM: 0.9
   WEIGHT_DECAY: 0.05
   OPTIMIZING_METHOD: adamw
 MODEL:
   NUM_CLASSES: 14
   ARCH: mvit
-  MODEL_NAME: MViTFGBGMixup
+  MODEL_NAME: DualMViTFGBG
   LOSS_FUNC: bce_logit
   HEAD_ACT: none
   DROPOUT_RATE: 0.5
+TEST:
+  ENABLE: True
+  DATASET: nkinetics
+  BATCH_SIZE: 8
+  NUM_SPATIAL_CROPS: 1
 DATA_LOADER:
-  NUM_WORKERS: 8
+  NUM_WORKERS: 4
   PIN_MEMORY: True
-NUM_GPUS: 4
-#NUM_GPUS: 2
+NUM_GPUS: 2
 NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0
-LOG_PERIOD: 1
-OUTPUT_DIR: /mnt/imslowfast/results/model=mvit2-base_bg_concat=32.0_minus_bg
+OUTPUT_DIR: results/model=dual_mvitv2

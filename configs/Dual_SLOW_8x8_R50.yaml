@@ -1,17 +1,15 @@
 TRAIN:
   ENABLE: True
-  DATASET: kinetics
-  BATCH_SIZE: 1
+  DATASET: nkinetics
+  BATCH_SIZE: 16
   EVAL_PERIOD: 1
-  CHECKPOINT_PERIOD: 100
-  CHECKPOINT_FILE_PATH: SLOWONLY_8x8_R50.pkl
-  CHECKPOINT_TYPE: caffe2
-  MIXED_PRECISION: True
+  CHECKPOINT_PERIOD: 1
+  BG_MODEL_CHECKPOINT_FILE_PATH:  weights/model=slow_r50_bg-only_rm-bg_e300.pyth
+  BG_MODEL_CHECKPOINT_TYPE: pytorch
+  FG_MODEL_CHECKPOINT_FILE_PATH:  weights/model=slow_r50_baseline_e300.pyth
+  FG_MODEL_CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
-TEST:
-  ENABLE: False
-  DATASET: kinetics
-  BATCH_SIZE: 192
+  MIXED_PRECISION: True
 DATA:
   NUM_FRAMES: 16
   SAMPLING_RATE: 24
@@ -19,13 +17,14 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /home/dl18206/Desktop/phd/code/personal/facebook/slowfast/dataset/annotations/fgbg/overfit
-  PATH_PREFIX: /home/dl18206/Desktop/phd/data/panaf/panaf_sequence
+  PATH_TO_DATA_DIR: data/annotations/full_data
+  PATH_PREFIX: data/videos/cropped
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
-  SPATIAL_SAMPLING: False
   TARGET_FPS: 24
-  PATH_LABEL_SEPARATOR_IDX: 1
+  #USE_MEAN: True
+AUG:
+  ENABLE: False
 TENSORBOARD:
   ENABLE: True
 RESNET:
@@ -44,27 +43,36 @@ BN:
   USE_PRECISE_STATS: False
   NUM_BATCHES_PRECISE: 200
 SOLVER:
-  BASE_LR: 2.5e-1
+  BASE_LR: 1e-1
   LR_POLICY: cosine
-  MAX_EPOCH: 300
+  MAX_EPOCH: 10
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
-  WARMUP_EPOCHS: 5.0
-  WARMUP_START_LR: 2.5e-2
+  WARMUP_EPOCHS: 1.0
+  WARMUP_START_LR: 1e-2
   OPTIMIZING_METHOD: sgd
 MODEL:
-  NUM_CLASSES: 2
+  NUM_CLASSES: 14
   ARCH: slow
-  MODEL_NAME: ResNet
+  MODEL_NAME: DualResNetFGBG
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
+  HEAD_MLP_DIM: 2048
+SAMPLING:
+  BALANCED: False
+TEST:
+  ENABLE: True
+  #CHECKPOINT_FILE_PATH: weights/best_ckpt.pyth
+  #CHECKPOINT_TYPE: pytorch
+  DATASET: nkinetics
+  BATCH_SIZE: 16
+  RETURN_FEATS: False
 DATA_LOADER:
-  NUM_WORKERS: 8
+  NUM_WORKERS: 4
   PIN_MEMORY: True
-NUM_GPUS: 1
+NUM_GPUS: 2
 NUM_SHARDS: 1
-USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: 'blah'
+OUTPUT_DIR: results/model=dual_slow_r50

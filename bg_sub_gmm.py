@@ -99,20 +99,20 @@ def main():
     parser.add_argument(
         "--video_dir",
         type=str,
-        default="/home/kukushkin/imslowfast/dataset/videos",
+        default="dataset/videos",
         help="Path to the video files",
     )
     parser.add_argument(
         "--annotations_dir",
         type=str,
-        default="/home/kukushkin/imslowfast/dataset/annotations/standard/fg_only",
+        default="dataset/annotations/standard/fg_only",
         help="Path to the annotations directory",
     )
 
     parser.add_argument(
         "--target_dir",
         type=str,
-        default="/home/kukushkin/imslowfast/dataset/bg_videos",
+        default="dataset/bg_videos",
         help="Path to the target directory",
     )
 

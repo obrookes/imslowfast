@@ -1,12 +1,15 @@
 TRAIN:
   ENABLE: True
-  DATASET: kinetics
-  BATCH_SIZE: 96
+  DATASET: nkinetics
+  BATCH_SIZE: 16
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
-  CHECKPOINT_FILE_PATH: SLOWONLY_8x8_R50.pkl
-  CHECKPOINT_TYPE: caffe2
+  BG_MODEL_CHECKPOINT_FILE_PATH:  weights/model=slow_r50_bg-only_rm-bg_e300.pyth
+  BG_MODEL_CHECKPOINT_TYPE: pytorch
+  FG_MODEL_CHECKPOINT_FILE_PATH:  weights/model=slow_r50_baseline_e300.pyth
+  FG_MODEL_CHECKPOINT_TYPE: pytorch
   AUTO_RESUME: False
+  MIXED_PRECISION: True
 DATA:
   NUM_FRAMES: 16
   SAMPLING_RATE: 24
@@ -14,18 +17,26 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_seq
-  PATH_PREFIX: /jmain02/home/J2AD001/wwp02/oxb63-wwp02/data/panaf_20k/videos/original
+  PATH_TO_DATA_DIR: data/annotations/full_data
+  PATH_PREFIX: data/videos/cropped
   MULTI_LABEL: True
   ENSEMBLE_METHOD: max
+  TARGET_FPS: 24
+  #USE_MEAN: True
 AUG:
-  MANIFOLD_MIXUP: True
-  MANIFOLD_MIXUP_ALPHA: 1.0
-  MANIFOLD_MIXUP_CLASS_FREQUENCIES: ""
-  MANIFOLD_MIXUP_PAIRS: False
-  MANIFOLD_MIXUP_TRIPLETS: True
-TAP:
   ENABLE: False
+FG_BG_MIXUP:
+  ENABLE: True
+  ADD_BG: 
+    ENABLE: False
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+  SUBTRACT_BG: 
+    ENABLE: True
+    ALPHA_MIN: 0.0
+    ALPHA_MAX: 1.0
+    ORTHO_EMBS: False # use orthogonal embeddings for bg subtraction (and addition, when ADD_BG2 is enabled)
+    SCHEDULER: exp  #linear, exp
 TENSORBOARD:
   ENABLE: True
 RESNET:
@@ -46,7 +57,7 @@ BN:
 SOLVER:
   BASE_LR: 1e-1
   LR_POLICY: cosine
-  MAX_EPOCH: 200
+  MAX_EPOCH: 10
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
   WARMUP_EPOCHS: 1.0
@@ -55,26 +66,25 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 14
   ARCH: slow
-  MODEL_NAME: ManifoldMixupResNet
+  MODEL_NAME: DualResNetFGBG
   HEAD_ACT: none
   LOSS_FUNC: bce_logit
   DROPOUT_RATE: 0.5
-  DETACH_FINAL_FC: False
-  DETACH_HEAD: False
-  REINIT_HEAD: False
+  HEAD_MLP_DIM: 2048
 SAMPLING:
   BALANCED: False
-  BALANCE_TYPE: none
 TEST:
   ENABLE: True
-  DATASET: kinetics
-  BATCH_SIZE: 96
+  #CHECKPOINT_FILE_PATH: weights/best_ckpt.pyth
+  #CHECKPOINT_TYPE: pytorch
+  DATASET: nkinetics
+  BATCH_SIZE: 16
+  RETURN_FEATS: False
 DATA_LOADER:
-  NUM_WORKERS: 8
+  NUM_WORKERS: 4
   PIN_MEMORY: True
-NUM_GPUS: 8
+NUM_GPUS: 2
 NUM_SHARDS: 1
 RNG_SEED: 0
 LOG_PERIOD: 1
-USE_SBATCH: True
-OUTPUT_DIR: model=slow-r50_method=manifold-mixup_triplets
+OUTPUT_DIR: results/model=dual_slow_r50_fgbg_mixup

@@ -3,6 +3,7 @@ dataset/videos_exp/
 dataset/videos_neg_only/
 dataset/videos_neg_static/
 dataset/results/
+notebooks/
 dataset/gradcam/videos/
 dataset/annotations/
 dataset/metadata/metadata.csv
