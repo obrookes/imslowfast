@@ -1796,7 +1796,9 @@ class ResNetFGBGMixup(nn.Module):
                             x = v[:]
                             x = self.s1(x)
                             x = self.s2(x)
-                            y = []  # Don't modify x list in place due to activation checkpoint.
+                            y = (
+                                []
+                            )  # Don't modify x list in place due to activation checkpoint.
                             for pathway in range(self.num_pathways):
                                 pool = getattr(self, "pathway{}_pool".format(pathway))
                                 y.append(pool(x[pathway]))
@@ -3604,6 +3606,10 @@ class MViTFGBGMixup(nn.Module):
             x["fg_frames"] = x.pop("concat_frames")
 
         mask = x["mask"]
+
+        if not self.add_bg2:
+            if "bg_frames2" in x.keys():
+                x.pop("bg_frames2")
 
         for k, v in x.items():
             if (k != "mask") and (k != "utm"):
