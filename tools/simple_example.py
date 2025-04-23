@@ -39,25 +39,72 @@ _POOL1 = {
 }
 
 
+def load_config():
+    # load slowfast model's default config
+    default_cfg = get_cfg()
+    # Create a dummy ResNet-50 configuration
+    model_cfg = {
+        "TRAIN": {
+            "ENABLE": True,
+            "DATASET": "bkinetics",
+            "BATCH_SIZE": 2,
+            "EVAL_PERIOD": 1,
+            # "MIXED_PRECISION": False,
+        },
+        "TEST": {
+            "ENABLE": False,
+            "DATASET": "nkinetics",
+        },
+        "DATA": {
+            "NUM_FRAMES": 4,
+            "INPUT_CHANNEL_NUM": [3],
+            "MULTI_LABEL": True,
+            "ENSEMBLE_METHOD": "max",
+        },
+        "FG_BG_MIXUP": {
+            "ENABLE": True,
+            "SUBTRACT_BG": {
+                "ENABLE": True,
+                "ALPHA_MIN": 0.0,
+                "ALPHA_MAX": 1.0,
+                "SCHEDULER": "linear",
+            },
+        },
+        "RESNET": {
+            "ZERO_INIT_FINAL_BN": True,
+            "DEPTH": 50,
+            "NUM_BLOCK_TEMP_KERNEL": [[3], [4], [6], [3]],
+        },
+        "SOLVER": {
+            "BASE_LR": 2.5e-1,
+            "MAX_EPOCH": 10,
+            "WARMUP_EPOCHS": 5.0,
+            "WARMUP_START_LR": 2.5e-2,
+        },
+        "MODEL": {
+            "NUM_CLASSES": 14,
+            "ARCH": "slow",
+            "MODEL_NAME": "ResNetFGBGMixup",
+            "HEAD_ACT": "none",
+            "LOSS_FUNC": "bce_logit",
+            "DROPOUT_RATE": 0.5,
+        },
+        "NUM_GPUS": 1,
+    }
+
+    # merge the model configuration with the default configuration
+    default_cfg.merge_from_other_cfg(CN(model_cfg))
+    return default_cfg
+
+
 class ResNetFGBGMixup(nn.Module):
     """
     ResNet model builder. It builds a ResNet like network backbone without
     lateral connection (C2D, I3D, Slow).
-
-    Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
-    "SlowFast networks for video recognition."
-    https://arxiv.org/pdf/1812.03982.pdf
-
-    Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
-    "Non-local neural networks."
-    https://arxiv.org/pdf/1711.07971.pdf
     """
 
     def __init__(self, cfg):
         """
-        The `__init__` method of any subclass should also contain these
-            arguments.
-
         Args:
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
@@ -65,10 +112,6 @@ class ResNetFGBGMixup(nn.Module):
         super(ResNetFGBGMixup, self).__init__()
         self.norm_module = batchnorm_helper.get_norm(cfg)
         self.num_pathways = 1
-        self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
-        self.sub_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
-
-        self.sub_bg_alpha_max = cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX
         self.dataset = cfg.TRAIN.DATASET
 
         self._construct_network(cfg)
@@ -130,10 +173,6 @@ class ResNetFGBGMixup(nn.Module):
             norm_module=self.norm_module,
         )
 
-        # Based on profiling data of activation size, s1 and s2 have the activation sizes
-        # that are 4X larger than the second largest. Therefore, checkpointing them gives
-        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
-        # with recomputing FLOPs.
         self.s1 = s1
         self.s2 = s2
 
@@ -228,7 +267,7 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x, alpha=0.0, beta=None, labels=None):
+    def forward(self, x, alpha=0.0):
 
         emb_dict = {}  # fg_frames, bg_frames
 
@@ -278,13 +317,11 @@ class ResNetFGBGMixup(nn.Module):
 
         mask = mask.clone().detach().bool()
 
-        if self.training and self.fg_bg_mixup_enable:
+        if self.training:
             # Mix embeddings based on the batch
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"], emb_dict["bg_frames"], mask, alpha
             )
-        else:
-            embs = emb_dict["fg_frames"]
         x = self.projection(embs)
 
         return x
@@ -303,110 +340,39 @@ class ResNetFGBGMixup(nn.Module):
         processed_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
         """
 
-        # Create copies to avoid modifying the original tensors
+        # Clone to avoid in-place modifications
         processed_embeddings = fg_embs.clone()
 
-        # Create a boolean mask for positive foregrounds
-        positive_mask = ~mask
+        if alpha <= 0.0:
+            return processed_embeddings
 
-        bg_embs_list = []
-        bg_sub_embs_list = []
+        # Find positive indices (foregrounds to process)
+        positive_indices = torch.where(~mask)[0]
 
-        positive_indices = torch.where(positive_mask)[0]
         for i in positive_indices:
-            if self.sub_bg:
-                if alpha > 0.0:
-                    print("Subtracting background embeddings with alpha parameter")
-                    # Subtract background embeddings with alpha
-                    bg_emb = bg_embs[i] * (1 - alpha)
+            fg_emb = fg_embs[i]
 
-                else:
-                    # Subtract background embeddings
-                    bg_emb = bg_embs[i]
+            # # subtract background embeddings from foreground embeddings (see Figure 6)
+            bg_emb = bg_embs[i] * (1 - alpha)
+            bg_sub_emb = fg_emb - bg_emb
 
-                fg_emb = fg_embs[i]
-                bg_sub_emb = fg_emb - bg_emb
-
-                processed_embeddings[i] = bg_sub_emb
-
-                # Append the background embeddings for orthogonalisation
-                bg_embs_list.append(bg_emb)
-                bg_sub_embs_list.append(bg_sub_emb)
+            processed_embeddings[i] = bg_sub_emb
 
         return processed_embeddings
 
 
-def load_config():
-    # load slowfast model's default config
-    default_cfg = get_cfg()
-    # Create a dummy ResNet-50 configuration
-    model_cfg = {
-        "TRAIN": {
-            "ENABLE": True,
-            "DATASET": "bkinetics",
-            "BATCH_SIZE": 2,
-            "EVAL_PERIOD": 1,
-            # "MIXED_PRECISION": False,
-        },
-        "TEST": {
-            "ENABLE": False,
-            "DATASET": "nkinetics",
-        },
-        "DATA": {
-            "NUM_FRAMES": 4,
-            "INPUT_CHANNEL_NUM": [3],
-            "MULTI_LABEL": True,
-            "ENSEMBLE_METHOD": "max",
-        },
-        "FG_BG_MIXUP": {
-            "ENABLE": True,
-            "SUBTRACT_BG": {
-                "ENABLE": True,
-                "ALPHA_MIN": 0.0,
-                "ALPHA_MAX": 1.0,
-                "SCHEDULER": "linear",
-            },
-        },
-        "RESNET": {
-            "ZERO_INIT_FINAL_BN": True,
-            "DEPTH": 50,
-            "NUM_BLOCK_TEMP_KERNEL": [[3], [4], [6], [3]],
-        },
-        "SOLVER": {
-            "BASE_LR": 2.5e-1,
-            "MAX_EPOCH": 10,
-            "WARMUP_EPOCHS": 5.0,
-            "WARMUP_START_LR": 2.5e-2,
-        },
-        "MODEL": {
-            "NUM_CLASSES": 14,
-            "ARCH": "slow",
-            "MODEL_NAME": "ResNetFGBGMixup",
-            "HEAD_ACT": "none",
-            "LOSS_FUNC": "bce_logit",
-            "DROPOUT_RATE": 0.5,
-        },
-        "NUM_GPUS": 1,
-    }
-
-    # Merge the example configuration with the default configuration
-    default_cfg.merge_from_other_cfg(CN(model_cfg))
-    return default_cfg
-
-
 if __name__ == "__main__":
-
-    # use GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if torch.device == "cuda":
-        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+        print("Using GPU:", torch.cuda.get_device_name(0))
     else:
+        device = torch.device("cpu")
         print("Using CPU")
 
-    # Load the configuration
+    # load config to build the model
     default_cfg = load_config()
 
-    # Create dummy data with shape (batch_size, channels, num_frames, height, width)
+    # create dummy data with shape (batch_size, channels, num_frames, height, width)
     fg_frames = torch.randn(
         default_cfg.TRAIN.BATCH_SIZE,
         default_cfg.DATA.INPUT_CHANNEL_NUM[0],
@@ -434,7 +400,6 @@ if __name__ == "__main__":
         else:
             data[k] = v.to(device)
 
-    print("Initialise model with following configuration:", default_cfg)
     model = ResNetFGBGMixup(cfg=default_cfg)
     model.to(device)
     output = model(data, alpha=0.5)
