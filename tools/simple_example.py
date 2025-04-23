@@ -66,12 +66,9 @@ class ResNetFGBGMixup(nn.Module):
         self.norm_module = batchnorm_helper.get_norm(cfg)
         self.num_pathways = 1
         self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
-        self.mix_on_eval = cfg.FG_BG_MIXUP.MIX_ON_EVAL
         self.sub_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
 
         self.sub_bg_alpha_max = cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX
-        self.concat_bg_frames = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE
-        self.concat_bg_frames_ratio = cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO
         self.dataset = cfg.TRAIN.DATASET
 
         self._construct_network(cfg)
@@ -281,9 +278,7 @@ class ResNetFGBGMixup(nn.Module):
 
         mask = mask.clone().detach().bool()
 
-        if (self.training and self.fg_bg_mixup_enable) or (
-            (not self.training) and (self.mix_on_eval)
-        ):
+        if self.training and self.fg_bg_mixup_enable:
             # Mix embeddings based on the batch
             embs = self.mix_fg_bg(
                 emb_dict["fg_frames"], emb_dict["bg_frames"], mask, alpha
@@ -401,9 +396,17 @@ def load_config():
 
 if __name__ == "__main__":
 
+    # use GPU if available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.device == "cuda":
+        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("Using CPU")
+
     # Load the configuration
     default_cfg = load_config()
 
+    # Create dummy data with shape (batch_size, channels, num_frames, height, width)
     fg_frames = torch.randn(
         default_cfg.TRAIN.BATCH_SIZE,
         default_cfg.DATA.INPUT_CHANNEL_NUM[0],
@@ -419,19 +422,11 @@ if __name__ == "__main__":
         default_cfg.DATA.TRAIN_CROP_SIZE,
     )
 
-    # Create dummy data with shape (batch_size, channels, num_frames, height, width)
     data = {
         "concat_frames": [fg_frames],
         "bg_frames": [bg_frames],
         "mask": torch.tensor(False),
     }
-
-    # use GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if torch.device == "cuda":
-        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-    else:
-        print("Using CPU")
 
     for k, v in data.items():
         if isinstance(v, list):
