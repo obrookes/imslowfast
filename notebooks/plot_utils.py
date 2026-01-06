@@ -336,7 +336,9 @@ def plot_map_values(datas, dpi=300):
     plt.show()
 
 
-def plot_behavior_distribution(df, behavior_list, annot="percentage", dpi=300):
+def plot_behavior_distribution(
+    df, behavior_list, annot="percentage", title="", dpi=300, plot=False
+):
     # Ensure the number of behaviors matches the length of multihot encodings
     num_behaviors = len(df["label"].iloc[0])
     if len(behavior_list) != num_behaviors:
@@ -349,43 +351,44 @@ def plot_behavior_distribution(df, behavior_list, annot="percentage", dpi=300):
 
     # Calculate the percentage of videos featuring each behavior
     if annot == "percentage":
-        behavior_percentages = (behavior_counts / len(df)) * 100
+        behavior_percentages = (behavior_counts / behavior_counts.sum()) * 100
     elif annot == "count":
         behavior_percentages = behavior_counts
     else:
         raise ValueError("annot must be either 'percentage' or 'count'")
 
     # Create a DataFrame for seaborn
-    plot_df = pd.DataFrame(
-        {"Behavior": behavior_list, "Percentage": behavior_percentages}
-    )
+    plot_df = pd.DataFrame({"behavior": behavior_list, annot: behavior_percentages})
 
     # Sort the DataFrame by percentage in descending order
-    plot_df = plot_df.sort_values("Percentage", ascending=False)
+    plot_df = plot_df.sort_values(annot, ascending=False)
 
-    # Create the plot
-    plt.figure(figsize=(8, 8), dpi=dpi)
-    sns.set(style="whitegrid")
+    if plot:
+        # Create the plot
+        plt.figure(figsize=(8, 8), dpi=dpi)
+        sns.set(style="whitegrid")
 
-    # Create the bar plot
-    ax = sns.barplot(x="Behavior", y="Percentage", data=plot_df)
+        # Create the bar plot
+        ax = sns.barplot(x="behavior", y=f"{annot}", data=plot_df)
 
-    # Customize the plot
-    plt.title("Distribution of Behaviors Across Videos", fontsize=16)
-    plt.xlabel("Behaviors", fontsize=12)
-    plt.ylabel("Percentage of Videos", fontsize=12)
-    plt.ylim(0, max(plot_df["Percentage"]) * 1.1)
+        # Customize the plot
+        plt.title(f"Distribution of Behaviors {title}", fontsize=16)
+        plt.xlabel("Behaviors", fontsize=12)
+        plt.ylabel(f"{annot.capitalize()} of Videos", fontsize=12)
+        plt.ylim(0, max(plot_df["Percentage"]) * 1.1)
 
-    # Rotate x-axis labels for better readability
-    plt.xticks(rotation=45, ha="right")
+        # Rotate x-axis labels for better readability
+        plt.xticks(rotation=45, ha="right")
 
-    # Add percentage labels on top of each bar
-    for i, v in enumerate(plot_df["Percentage"]):
-        ax.text(i, v + 0.5, f"{v:.1f}", ha="center", va="bottom")
+        # Add percentage labels on top of each bar
+        for i, v in enumerate(plot_df["Percentage"]):
+            ax.text(i, v + 0.5, f"{v:.1f}", ha="center", va="bottom")
 
-    # Adjust layout to prevent cutting off labels
-    plt.tight_layout()
-    plt.show()
+        # Adjust layout to prevent cutting off labels
+        plt.tight_layout()
+        plt.show()
+
+    return plot_df
 
 
 def plot_aggregated_behavior_distribution(

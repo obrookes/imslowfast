@@ -131,17 +131,30 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                 # Perform the forward pass.
                 preds, feats, cas = model(inputs)
             elif cfg.FG_BG_MIXUP.ENABLE:
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                    alpha_scheduler = torch.linspace(
+                        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+                        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                        cfg.SOLVER.MAX_EPOCH,
+                    )
+                    alpha = alpha_scheduler[epoch]
+                    if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE:
+                        beta = 1 - alpha
+                        preds = model(inputs, alpha, beta)
+                    else:
+                        preds = model(inputs, alpha)
+            elif (
+                cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+            ):
                 alpha_scheduler = torch.linspace(
-                    cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
-                    cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                    cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MIN,
+                    cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MAX,
                     cfg.SOLVER.MAX_EPOCH,
                 )
-                alpha = alpha_scheduler[epoch]
-                if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE:
-                    beta = 1 - alpha
-                    preds = model(inputs, alpha, beta)
-                else:
-                    preds = model(inputs, alpha)
+                preds = model(inputs, alpha_scheduler[epoch])
+            elif cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE:
+                preds = model(inputs)
             else:
                 out = model(inputs)
         else:
@@ -150,6 +163,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
 
         # all_preds.append(preds)
         if cfg.FG_BG_MIXUP.ENABLE:
+            all_names.extend(meta["fg_video_name"])
+        elif cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE:
             all_names.extend(meta["fg_video_name"])
         else:
             all_names.extend(meta["video_name"])
@@ -161,6 +176,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                 all_cas.append(cas)
                 all_preds.append(preds)
             elif cfg.FG_BG_MIXUP.ENABLE:
+                all_preds.append(preds)
+            elif cfg.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE:
                 all_preds.append(preds)
             else:
                 preds, feats = out[0], out[1]
@@ -235,7 +252,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
                 test_meter,
                 all_names,
                 all_preds,
-                torch.cat(all_feats, dim=0),
+                None if all_feats == [] else torch.cat(all_feats, dim=0),
                 all_labels,
             )
     else:
@@ -372,7 +389,8 @@ def test(cfg):
     # Save the output features
     if cfg.TEST.RETURN_FEATS or (cfg.TAP.ENABLE and cfg.TEST.RETURN_CAS):
         save_path = os.path.join(
-            cfg.OUTPUT_DIR, f"{cfg.OUTPUT_DIR.split('/')[-1]}_feats.pkl"
+            cfg.OUTPUT_DIR,
+            f"{cfg.OUTPUT_DIR.split('/')[-1]}_e{checkpoint['epoch']+1}_feats.pkl",
         )
         if du.is_root_proc():
             with pathmgr.open(save_path, "wb") as f:

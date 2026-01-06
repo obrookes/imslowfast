@@ -4,6 +4,7 @@
 """ResNe(X)t Head helper."""
 
 from functools import partial
+
 import torch
 import torch.nn as nn
 from detectron2.layers import ROIAlign
@@ -13,7 +14,6 @@ from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import (
     NaiveSyncBatchNorm1d as NaiveSyncBatchNorm1d,
 )
-from slowfast.models.nonlocal_helper import Nonlocal
 
 logger = logging.get_logger(__name__)
 
@@ -432,7 +432,6 @@ class X3DHead(nn.Module):
         self._construct_head(dim_in, dim_inner, dim_out, norm_module)
 
     def _construct_head(self, dim_in, dim_inner, dim_out, norm_module):
-
         self.conv_5 = nn.Conv3d(
             dim_in,
             dim_inner,

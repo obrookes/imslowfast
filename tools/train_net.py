@@ -179,11 +179,18 @@ def train_epoch(
             )
         except:
             try:
-                batch_size = (
-                    inputs["fg_frames"][0].size(0)
-                    if isinstance(inputs, dict)
-                    else inputs["fg_frames"].size(0)
-                )
+                try:
+                    batch_size = (
+                        inputs["fg_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+                except:
+                    batch_size = (
+                        inputs["concat_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
             except:
                 batch_size = (
                     inputs["f1"][0].size(0)
@@ -232,14 +239,54 @@ def train_epoch(
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds, y_a, y_b, lam = model(inputs, labels)
             elif cfg.FG_BG_MIXUP.ENABLE:
-                if (
-                    cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
-                    and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
-                ):
-                    beta = 1 - alpha
-                    preds = model(inputs, alpha, beta)
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.ENABLE:
+                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                        if (
+                            cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                            and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                        ):
+                            beta = 1 - alpha
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(
+                                    inputs, alpha, beta, labels=labels
+                                )
+                            else:
+                                preds = model(inputs, alpha, beta, labels=labels)
+                        else:
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha, labels=labels)
+                            else:
+                                preds = model(inputs, alpha, labels=labels)
+                    elif (
+                        cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                        and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+                    ):
+                        preds = model(inputs, alpha, labels=labels)
                 else:
-                    preds = model(inputs, alpha)
+                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                        if (
+                            cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                            and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                        ):
+                            beta = 1 - alpha
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha, beta)
+                            else:
+                                preds = model(inputs, alpha, beta)
+                        else:
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha)
+                            else:
+                                preds = model(inputs, alpha)
+                    elif (
+                        cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                        and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+                    ):
+                        preds = model(inputs, alpha)
+
+                    else:
+                        preds = model(inputs, alpha)
+
             elif cfg.FRAMEWISE_MIXUP.ENABLE:
                 preds, lam, index = model(inputs)
             else:
@@ -292,7 +339,11 @@ def train_epoch(
                     loss = loss.mean()
             else:
                 # Compute the loss.
-                loss = loss_fun(preds, labels)
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                    assert len(preds) == len(labels)
+                    loss = loss_fun(preds, labels) + loss_ortho
+                else:
+                    loss = loss_fun(preds, labels)
 
         loss_extra = None
         if isinstance(loss, (list, tuple)):
@@ -530,11 +581,18 @@ def eval_epoch(
             )
         except:
             try:
-                batch_size = (
-                    inputs["fg_frames"][0].size(0)
-                    if isinstance(inputs, dict)
-                    else inputs["fg_frames"].size(0)
-                )
+                try:
+                    batch_size = (
+                        inputs["fg_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+                except:
+                    batch_size = (
+                        inputs["concat_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
             except:
                 batch_size = (
                     inputs["f1"][0].size(0)
@@ -590,9 +648,8 @@ def eval_epoch(
             elif cfg.FGFG_MIXUP.ENABLE:
                 preds = model(inputs, labels)
             elif cfg.FG_BG_MIXUP.ENABLE:
-                if (
-                    cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
-                    and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE and cur_epoch >= (
+                    cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
                 ):
                     beta = 1 - alpha
                     preds = model(inputs, alpha, beta)
@@ -757,11 +814,25 @@ def train(cfg):
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
 
-    alpha_scheduler = torch.linspace(
-        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
-        cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
-        cfg.SOLVER.MAX_EPOCH,
-    )
+    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is True:
+        if cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "exp":
+            alpha_scheduler = torch.logspace(-10, 0, cfg.SOLVER.MAX_EPOCH, base=torch.e)
+
+        elif cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "linear":
+            alpha_scheduler = torch.linspace(
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                cfg.SOLVER.MAX_EPOCH,
+            )
+    elif cfg.FG_BG_MIXUP.ADD_BG.ENABLE is True:
+        if cfg.FG_BG_MIXUP.ADD_BG.SCHEDULER == "linear":
+            alpha_scheduler = torch.linspace(
+                cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MIN,
+                cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MAX,
+                cfg.SOLVER.MAX_EPOCH,
+            )
+    else:
+        alpha_scheduler = None
 
     # Init multigrid.
     multigrid = None
@@ -925,6 +996,66 @@ def train(cfg):
 
         # Train for one epoch.
         epoch_timer.epoch_tic()
+        if alpha_scheduler is not None:
+            alpha = alpha_scheduler[cur_epoch]
+        else:
+            alpha = 0.0
+
+        if (
+            cfg.MODEL.MODEL_NAME == "DualResNetFGBG"
+            or cfg.MODEL.MODEL_NAME == "DualMViTFGBG"
+        ):
+            # print("DualMViTFGBG")
+            if cfg.NUM_GPUS > 1:
+                print("Loading FG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.module.fg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+                print("Loading BG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.module.bg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+            else:
+                print("Loading FG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.fg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+                print("Loading BG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.bg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
         train_epoch(
             train_loader,
             model,
@@ -935,7 +1066,7 @@ def train(cfg):
             cfg,
             writer,
             pseudo_labels,
-            alpha_scheduler[cur_epoch],
+            alpha,
         )
         epoch_timer.epoch_toc()
         logger.info(
@@ -994,6 +1125,10 @@ def train(cfg):
             )
         # Evaluate the model on validation set.
         if is_eval_epoch:
+            alpha_scheduler_value = (
+                alpha_scheduler[cur_epoch] if alpha_scheduler is not None else 0.0
+            )
+
             eval_epoch(
                 val_loader,
                 model,
@@ -1002,7 +1137,7 @@ def train(cfg):
                 cfg,
                 train_loader,
                 writer,
-                alpha_scheduler[cur_epoch],
+                alpha_scheduler_value,
             )
     if (
         start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE

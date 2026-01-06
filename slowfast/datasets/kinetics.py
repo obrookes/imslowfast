@@ -125,9 +125,13 @@ class Kinetics(torch.utils.data.Dataset):
             else:
                 rows = f.read().splitlines()
             for clip_idx, path_label in enumerate(rows):
-                fetch_info = path_label.split(self.cfg.DATA.PATH_LABEL_SEPARATOR)
+                fetch_info = path_label.split(
+                    self.cfg.DATA.PATH_LABEL_SEPARATOR,
+                    self.cfg.DATA.PATH_LABEL_SEPARATOR_IDX,
+                )
                 if len(fetch_info) == 2:
                     path, label = fetch_info
+                    label = ast.literal_eval(ast.literal_eval(label))
                 elif len(fetch_info) == 3:
                     path, fn, label = fetch_info
                 elif len(fetch_info) == 1:

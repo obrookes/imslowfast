@@ -151,10 +151,25 @@ def _get_model_analysis_input(cfg, use_train_input):
         labels = torch.rand(1, cfg.MODEL.NUM_CLASSES)
         inputs = (model_inputs, labels)
     elif cfg.TRAIN.DATASET == "nkinetics":
+        if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE:
+            inputs = {
+                "fg_frames": model_inputs,
+                "bg_frames": model_inputs,
+                "bg2_frames": model_inputs,
+                "mask": torch.ones(1),
+                "utm": torch.ones(1),
+            }
+        else:
+            inputs = {
+                "fg_frames": model_inputs,
+                "bg_frames": model_inputs,
+                "mask": torch.ones(1),
+                "utm": torch.ones(1),
+            }
+    elif cfg.TRAIN.DATASET == "bkinetics":
         inputs = {
-            "fg_frames": model_inputs,
+            "concat_frames": model_inputs,
             "bg_frames": model_inputs,
-            "bg2_frames": model_inputs,
             "mask": torch.ones(1),
             "utm": torch.ones(1),
         }

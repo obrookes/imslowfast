@@ -201,6 +201,19 @@ _C.TRAIN.MIXED_PRECISION = False
 # if True, inflate some params from imagenet model.
 _C.TRAIN.CHECKPOINT_IN_INIT = False
 
+
+# Path to the bg model checkpoint to load the initial weight.
+_C.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH = ""
+
+# Checkpoint types include `caffe2` or `pytorch`.
+_C.TRAIN.BG_MODEL_CHECKPOINT_TYPE = "pytorch"
+
+# Path to the fg model checkpoint to load the initial weight.
+_C.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH = ""
+
+# Checkpoint types include `caffe2` or `pytorch`.
+_C.TRAIN.FG_MODEL_CHECKPOINT_TYPE = "pytorch"
+
 # ---------------------------------------------------------------------------- #
 # Augmentation options.
 # ---------------------------------------------------------------------------- #
@@ -502,6 +515,11 @@ _C.MODEL.FROZEN_BN = False
 # If True, AllReduce gradients are compressed to fp16
 _C.MODEL.FP16_ALLREDUCE = False
 
+_C.MODEL.FEAT_AGGREGATOR = "avg_pool"
+
+# use for dual fg bg model only
+_C.MODEL.HEAD_MLP_DIM = 2048
+
 
 # -----------------------------------------------------------------------------
 # MViT options
@@ -715,11 +733,17 @@ _C.SLOWFAST.FUSION_KERNEL_SZ = 5
 # -----------------------------------------------------------------------------
 _C.DATA = CfgNode()
 
+# Switch spatial sampling on/off
+_C.DATA.SPATIAL_SAMPLING = False
+
 # The path to the data directory.
 _C.DATA.PATH_TO_DATA_DIR = ""
 
 # The separator used between path and label.
 _C.DATA.PATH_LABEL_SEPARATOR = " "
+
+# The separator used between path and label.
+_C.DATA.PATH_LABEL_SEPARATOR_IDX = -1
 
 # Video path prefix if any.
 _C.DATA.PATH_PREFIX = ""
@@ -744,6 +768,11 @@ _C.DATA.TRAIN_PCA_EIGVEC = [
 # `{"im_path": im_path, "class": cont_id}`
 # then we can skip the construction of imdb and load it from the local file.
 _C.DATA.PATH_TO_PRELOAD_IMDB = ""
+
+# If true use mean and std for normalization.
+_C.DATA.USE_MEAN = True
+
+_C.DATA.MEAN = [0.45, 0.45, 0.45]
 
 # The mean value of the video raw pixels across the R G B channels.
 _C.DATA.MEAN = [0.45, 0.45, 0.45]
@@ -881,27 +910,58 @@ _C.FG_BG_MIXUP.RAND_SUB = False
 
 _C.FG_BG_MIXUP.MIX_ON_EVAL = False
 
+_C.FG_BG_MIXUP.ADD_BG = CfgNode()
+
+_C.FG_BG_MIXUP.ADD_BG.ENABLE = False
+
+_C.FG_BG_MIXUP.ADD_BG.ALPHA_MIN = 0.0
+
+_C.FG_BG_MIXUP.ADD_BG.ALPHA_MAX = 1.0
+
+_C.FG_BG_MIXUP.ADD_BG.SCHEDULER = "linear"
+
 _C.FG_BG_MIXUP.SUBTRACT_BG = CfgNode()
 
-_C.FG_BG_MIXUP.SUBTRACT_BG.ENABLE = True
+_C.FG_BG_MIXUP.SUBTRACT_BG.ENABLE = False
 
 _C.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN = 0.0
 
 _C.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX = 1.0
 
+_C.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER = "linear"
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE = CfgNode()
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.ENABLE = False
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.CLASSES = []
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS = False
+
 _C.FG_BG_MIXUP.ADD_BG2 = CfgNode()
 
-_C.FG_BG_MIXUP.ADD_BG2.ENABLE = True
+_C.FG_BG_MIXUP.ADD_BG2.ENABLE = False
 
 _C.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH = 100
 
 _C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME = CfgNode()
 
-_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.ENABLE = True
+_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.ENABLE = False
 
 _C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.DUPLICATE_FRAME = False
 
 _C.FG_BG_MIXUP.GEN_BG_NO_GRAD = False
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES = CfgNode()
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE = False
+
+# 1.0 - concat all frames of bg video
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO = 1.0
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.SORT_BG_FRAMES = False
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.SUBSAMPLE_CONCAT_FRAMES = False
 
 # ---------------------------------------------------------------------------- #
 # FG-FG Mixup options
