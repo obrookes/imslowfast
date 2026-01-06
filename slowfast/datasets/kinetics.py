@@ -131,7 +131,8 @@ class Kinetics(torch.utils.data.Dataset):
                 )
                 if len(fetch_info) == 2:
                     path, label = fetch_info
-                    label = ast.literal_eval(ast.literal_eval(label))
+                    label = ast.literal_eval(label)
+                    # label = ast.literal_eval(ast.literal_eval(label))
                 elif len(fetch_info) == 3:
                     path, fn, label = fetch_info
                 elif len(fetch_info) == 1:

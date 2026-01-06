@@ -1,0 +1,1365 @@
+Running on host nid001037
+Time is Tue 17 Dec 14:52:49 UTC 2024
+Slurm job ID is 34413
+/usr/bin/rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+config files: ['/mnt/imslowfast/configs/species_classification/SLOW_8x8_R50_DISJOINT_F=32_TEST.yaml']
+[12/17 14:53:14][INFO] test_net.py:  276: Test with config:
+[12/17 14:53:14][INFO] test_net.py:  277: AUG:
+  AA_TYPE: rand-m9-mstd0.5-inc1
+  COLOR_JITTER: 0.4
+  ENABLE: True
+  GEN_MASK_LOADER: False
+  INTERPOLATION: bicubic
+  MANIFOLD_MIXUP: False
+  MANIFOLD_MIXUP_ALPHA: 1.0
+  MANIFOLD_MIXUP_CLASS_FREQUENCIES: 
+  MANIFOLD_MIXUP_PAIRS: False
+  MANIFOLD_MIXUP_TRIPLETS: False
+  MASK_FRAMES: False
+  MASK_RATIO: 0.0
+  MASK_TUBE: False
+  MASK_WINDOW_SIZE: [8, 7, 7]
+  MAX_MASK_PATCHES_PER_BLOCK: None
+  NUM_SAMPLE: 1
+  RE_COUNT: 1
+  RE_MODE: pixel
+  RE_PROB: 0.25
+  RE_SPLIT: False
+AVA:
+  ANNOTATION_DIR: /mnt/vol/gfsai-flash3-east/ai-group/users/haoqifan/ava/frame_list/
+  BGR: False
+  DETECTION_SCORE_THRESH: 0.9
+  EXCLUSION_FILE: ava_val_excluded_timestamps_v2.2.csv
+  FRAME_DIR: /mnt/fair-flash3-east/ava_trainval_frames.img/
+  FRAME_LIST_DIR: /mnt/vol/gfsai-flash3-east/ai-group/users/haoqifan/ava/frame_list/
+  FULL_TEST_ON_VAL: False
+  GROUNDTRUTH_FILE: ava_val_v2.2.csv
+  IMG_PROC_BACKEND: cv2
+  LABEL_MAP_FILE: ava_action_list_v2.2_for_activitynet_2019.pbtxt
+  TEST_FORCE_FLIP: False
+  TEST_LISTS: ['val.csv']
+  TEST_PREDICT_BOX_LISTS: ['ava_val_predicted_boxes.csv']
+  TRAIN_GT_BOX_LISTS: ['ava_train_v2.2.csv']
+  TRAIN_LISTS: ['train.csv']
+  TRAIN_PCA_JITTER_ONLY: True
+  TRAIN_PREDICT_BOX_LISTS: []
+  TRAIN_USE_COLOR_AUGMENTATION: False
+BENCHMARK:
+  LOG_PERIOD: 100
+  NUM_EPOCHS: 5
+  SHUFFLE: True
+BN:
+  GLOBAL_SYNC: False
+  NORM_TYPE: batchnorm
+  NUM_BATCHES_PRECISE: 200
+  NUM_SPLITS: 1
+  NUM_SYNC_DEVICES: 1
+  USE_PRECISE_STATS: False
+  WEIGHT_DECAY: 0.0
+CONTRASTIVE:
+  BN_MLP: False
+  BN_SYNC_MLP: False
+  DELTA_CLIPS_MAX: inf
+  DELTA_CLIPS_MIN: -inf
+  DIM: 128
+  INTERP_MEMORY: False
+  KNN_ON: True
+  LENGTH: 239975
+  LOCAL_SHUFFLE_BN: True
+  MEM_TYPE: 1d
+  MLP_DIM: 2048
+  MOCO_MULTI_VIEW_QUEUE: False
+  MOMENTUM: 0.5
+  MOMENTUM_ANNEALING: False
+  NUM_CLASSES_DOWNSTREAM: 400
+  NUM_MLP_LAYERS: 1
+  PREDICTOR_DEPTHS: []
+  QUEUE_LEN: 65536
+  SEQUENTIAL: False
+  SIMCLR_DIST_ON: True
+  SWAV_QEUE_LEN: 0
+  T: 0.07
+  TYPE: mem
+DATA:
+  COLOR_RND_GRAYSCALE: 0.0
+  DECODING_BACKEND: torchvision
+  DECODING_SHORT_SIZE: 256
+  DUMMY_LOAD: False
+  ENSEMBLE_METHOD: sum
+  IN22K_TRAINVAL: False
+  IN22k_VAL_IN1K: 
+  INPUT_CHANNEL_NUM: [3]
+  INV_UNIFORM_SAMPLE: False
+  IN_VAL_CROP_RATIO: 0.875
+  LOADER_CHUNK_OVERALL_SIZE: 0
+  LOADER_CHUNK_SIZE: 0
+  MEAN: [0.45, 0.45, 0.45]
+  MULTI_LABEL: False
+  NUM_FRAMES: 32
+  PATH_LABEL_SEPARATOR:  
+  PATH_LABEL_SEPARATOR_IDX: -1
+  PATH_PREFIX: /mnt/data/top_priority_species
+  PATH_TO_DATA_DIR: /mnt/data/top_priority_annotations/kinetics/disjoint
+  PATH_TO_PRELOAD_IMDB: 
+  PSEUDO_LABELS: 
+  PSEUDO_LABELS_WEIGHT: 1.0
+  RANDOM_FLIP: True
+  REVERSE_INPUT_CHANNEL: False
+  SAMPLING_RATE: 24
+  SKIP_ROWS: 0
+  SPATIAL_SAMPLING: False
+  SSL_BLUR_SIGMA_MAX: [0.0, 2.0]
+  SSL_BLUR_SIGMA_MIN: [0.0, 0.1]
+  SSL_COLOR_BRI_CON_SAT: [0.4, 0.4, 0.4]
+  SSL_COLOR_HUE: 0.1
+  SSL_COLOR_JITTER: False
+  SSL_MOCOV2_AUG: False
+  STD: [0.225, 0.225, 0.225]
+  TARGET_FPS: 24
+  TEST_CROP_SIZE: 256
+  TIME_DIFF_PROB: 0.0
+  TRAIN_CROP_NUM_SPATIAL: 1
+  TRAIN_CROP_NUM_TEMPORAL: 1
+  TRAIN_CROP_SIZE: 256
+  TRAIN_JITTER_ASPECT_RELATIVE: []
+  TRAIN_JITTER_FPS: 0.0
+  TRAIN_JITTER_MOTION_SHIFT: False
+  TRAIN_JITTER_SCALES: [256, 320]
+  TRAIN_JITTER_SCALES_RELATIVE: []
+  TRAIN_PCA_EIGVAL: [0.225, 0.224, 0.229]
+  TRAIN_PCA_EIGVEC: [[-0.5675, 0.7192, 0.4009], [-0.5808, -0.0045, -0.814], [-0.5836, -0.6948, 0.4203]]
+  USE_MEAN: True
+  USE_OFFSET_SAMPLING: False
+DATA_LOADER:
+  ENABLE_MULTI_THREAD_DECODE: False
+  NUM_WORKERS: 8
+  PIN_MEMORY: True
+DEMO:
+  BUFFER_SIZE: 0
+  CLIP_VIS_SIZE: 10
+  COMMON_CLASS_NAMES: ['watch (a person)', 'talk to (e.g., self, a person, a group)', 'listen to (a person)', 'touch (an object)', 'carry/hold (an object)', 'walk', 'sit', 'lie/sleep', 'bend/bow (at the waist)']
+  COMMON_CLASS_THRES: 0.7
+  DETECTRON2_CFG: COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml
+  DETECTRON2_THRESH: 0.9
+  DETECTRON2_WEIGHTS: detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl
+  DISPLAY_HEIGHT: 0
+  DISPLAY_WIDTH: 0
+  ENABLE: False
+  FPS: 30
+  GT_BOXES: 
+  INPUT_FORMAT: BGR
+  INPUT_VIDEO: 
+  LABEL_FILE_PATH: 
+  NUM_CLIPS_SKIP: 0
+  NUM_VIS_INSTANCES: 2
+  OUTPUT_FILE: 
+  OUTPUT_FPS: -1
+  PREDS_BOXES: 
+  SLOWMO: 1
+  STARTING_SECOND: 900
+  THREAD_ENABLE: False
+  UNCOMMON_CLASS_THRES: 0.3
+  VIS_MODE: thres
+  WEBCAM: -1
+DETECTION:
+  ALIGNED: True
+  ENABLE: False
+  ROI_XFORM_RESOLUTION: 7
+  SPATIAL_SCALE_FACTOR: 16
+DIST_BACKEND: nccl
+FGFG_MIXUP:
+  ENABLE: False
+FG_BG_MIXUP:
+  ADD_BG:
+    ALPHA_MAX: 1.0
+    ALPHA_MIN: 0.0
+    ENABLE: False
+    SCHEDULER: linear
+  ADD_BG2:
+    ENABLE: False
+    START_FROM_EPOCH: 100
+  CONCAT_BG_FRAMES:
+    ENABLE: False
+    RATIO: 1.0
+    SORT_BG_FRAMES: False
+    SUBSAMPLE_CONCAT_FRAMES: False
+  ENABLE: False
+  GEN_BG_NO_GRAD: False
+  MIX_ON_EVAL: False
+  RAND_SUB: False
+  SELECT_RAND_BG_FRAME:
+    DUPLICATE_FRAME: False
+    ENABLE: False
+  SUBTRACT_BG:
+    ALPHA_MAX: 1.0
+    ALPHA_MIN: 0.0
+    APPLY_CLASSWISE:
+      CLASSES: []
+      ENABLE: False
+    ENABLE: False
+    ORTHO_EMBS: False
+    SCHEDULER: linear
+FRAMEWISE_MIXUP:
+  ENABLE: False
+  INDEPENDENT_FRAME_MIX: False
+  RANDOMISE_FRAME_MIX: False
+LOG_MODEL_INFO: True
+LOG_PERIOD: 1
+MASK:
+  DECODER_DEPTH: 0
+  DECODER_EMBED_DIM: 512
+  DECODER_SEP_POS_EMBED: False
+  DEC_KV_KERNEL: []
+  DEC_KV_STRIDE: []
+  ENABLE: False
+  HEAD_TYPE: separate
+  MAE_ON: False
+  MAE_RND_MASK: False
+  NORM_PRED_PIXEL: True
+  PER_FRAME_MASKING: False
+  PRED_HOG: False
+  PRETRAIN_DEPTH: [15]
+  SCALE_INIT_BY_DEPTH: False
+  TIME_STRIDE_LOSS: True
+MIXUP:
+  ALPHA: 0.8
+  CUTMIX_ALPHA: 1.0
+  ENABLE: False
+  LABEL_SMOOTH_VALUE: 0.1
+  PROB: 1.0
+  SWITCH_PROB: 0.5
+MODEL:
+  ACT_CHECKPOINT: False
+  ARCH: slow
+  DETACH_FINAL_FC: False
+  DETACH_HEAD: False
+  DROPCONNECT_RATE: 0.0
+  DROPOUT_RATE: 0.5
+  FC_INIT_STD: 0.01
+  FEAT_AGGREGATOR: avg_pool
+  FP16_ALLREDUCE: False
+  FROZEN_BN: False
+  HEAD_ACT: none
+  HEAD_MLP_DIM: 2048
+  LOSS_FUNC: cross_entropy
+  MODEL_NAME: ResNet
+  MULTI_PATHWAY_ARCH: ['slowfast']
+  NUM_CLASSES: 16
+  REINIT_HEAD: False
+  SINGLE_PATHWAY_ARCH: ['2d', 'c2d', 'i3d', 'slow', 'x3d', 'mvit', 'maskmvit']
+MULTIGRID:
+  BN_BASE_SIZE: 8
+  DEFAULT_B: 0
+  DEFAULT_S: 0
+  DEFAULT_T: 0
+  EPOCH_FACTOR: 1.5
+  EVAL_FREQ: 3
+  LONG_CYCLE: False
+  LONG_CYCLE_FACTORS: [(0.25, 0.7071067811865476), (0.5, 0.7071067811865476), (0.5, 1), (1, 1)]
+  LONG_CYCLE_SAMPLING_RATE: 0
+  SHORT_CYCLE: False
+  SHORT_CYCLE_FACTORS: [0.5, 0.7071067811865476]
+MVIT:
+  CLS_EMBED_ON: True
+  DEPTH: 16
+  DIM_MUL: []
+  DIM_MUL_IN_ATT: False
+  DROPOUT_RATE: 0.0
+  DROPPATH_RATE: 0.1
+  EMBED_DIM: 96
+  HEAD_INIT_SCALE: 1.0
+  HEAD_MUL: []
+  LAYER_SCALE_INIT_VALUE: 0.0
+  MLP_RATIO: 4.0
+  MODE: conv
+  NORM: layernorm
+  NORM_STEM: False
+  NUM_HEADS: 1
+  PATCH_2D: False
+  PATCH_KERNEL: [3, 7, 7]
+  PATCH_PADDING: [2, 4, 4]
+  PATCH_STRIDE: [2, 4, 4]
+  POOL_FIRST: False
+  POOL_KVQ_KERNEL: None
+  POOL_KV_STRIDE: []
+  POOL_KV_STRIDE_ADAPTIVE: None
+  POOL_Q_STRIDE: []
+  QKV_BIAS: True
+  REL_POS_SPATIAL: False
+  REL_POS_TEMPORAL: False
+  REL_POS_ZERO_INIT: False
+  RESIDUAL_POOLING: False
+  REV:
+    BUFFER_LAYERS: []
+    ENABLE: False
+    PRE_Q_FUSION: avg
+    RESPATH_FUSE: concat
+    RES_PATH: conv
+  SEPARATE_QKV: False
+  SEP_POS_EMBED: False
+  USE_ABS_POS: True
+  USE_FIXED_SINCOS_POS: False
+  USE_MEAN_POOLING: False
+  ZERO_DECAY_POS_CLS: True
+NONLOCAL:
+  GROUP: [[1], [1], [1], [1]]
+  INSTANTIATION: dot_product
+  LOCATION: [[[]], [[]], [[]], [[]]]
+  POOL: [[[1, 2, 2], [1, 2, 2]], [[1, 2, 2], [1, 2, 2]], [[1, 2, 2], [1, 2, 2]], [[1, 2, 2], [1, 2, 2]]]
+NUM_GPUS: 4
+NUM_SHARDS: 1
+OUTPUT_DIR: /mnt/imslowfast/results/species_classification/disjoint_f=32_test
+RESNET:
+  DEPTH: 50
+  INPLACE_RELU: True
+  NUM_BLOCK_TEMP_KERNEL: [[3], [4], [6], [3]]
+  NUM_GROUPS: 1
+  SPATIAL_DILATIONS: [[1], [1], [1], [1]]
+  SPATIAL_STRIDES: [[1], [2], [2], [2]]
+  STRIDE_1X1: False
+  TRANS_FUNC: bottleneck_transform
+  WIDTH_PER_GROUP: 64
+  ZERO_INIT_FINAL_BN: True
+  ZERO_INIT_FINAL_CONV: False
+RNG_SEED: 0
+SAMPLING:
+  BALANCED: False
+  BALANCE_TYPE: None
+SHARD_ID: 0
+SLOWFAST:
+  ALPHA: 8
+  BETA_INV: 8
+  FUSION_CONV_CHANNEL_RATIO: 2
+  FUSION_KERNEL_SZ: 5
+SOLVER:
+  BASE_LR: 0.25
+  BASE_LR_SCALE_NUM_SHARDS: False
+  BETAS: (0.9, 0.999)
+  CLIP_GRAD_L2NORM: None
+  CLIP_GRAD_VAL: None
+  COSINE_AFTER_WARMUP: False
+  COSINE_END_LR: 0.0
+  DAMPENING: 0.0
+  GAMMA: 0.1
+  LARS_ON: False
+  LAYER_DECAY: 1.0
+  LRS: []
+  LR_POLICY: cosine
+  MAX_EPOCH: 48
+  MOMENTUM: 0.9
+  NESTEROV: True
+  OPTIMIZING_METHOD: sgd
+  STEPS: []
+  STEP_SIZE: 1
+  WARMUP_EPOCHS: 5.0
+  WARMUP_FACTOR: 0.1
+  WARMUP_START_LR: 0.025
+  WEIGHT_DECAY: 0.0001
+  ZERO_WD_1D_PARAM: False
+TAP:
+  ENABLE: False
+  NUM_CLIPS: 4
+  NUM_FRAMES: 4
+  OVERLAP: None
+  SLIDING_WINDOW: False
+TASK: 
+TENSORBOARD:
+  CATEGORIES_PATH: 
+  CLASS_NAMES_PATH: 
+  CONFUSION_MATRIX:
+    ENABLE: False
+    FIGSIZE: [8, 8]
+    SUBSET_PATH: 
+  ENABLE: True
+  HISTOGRAM:
+    ENABLE: False
+    FIGSIZE: [8, 8]
+    SUBSET_PATH: 
+    TOPK: 10
+  LOG_DIR: 
+  MODEL_VIS:
+    ACTIVATIONS: False
+    COLORMAP: Pastel2
+    ENABLE: False
+    GRAD_CAM:
+      COLORMAP: viridis
+      ENABLE: True
+      LAYER_LIST: []
+      USE_TRUE_LABEL: False
+    INPUT_VIDEO: False
+    LAYER_LIST: []
+    MODEL_WEIGHTS: False
+    TOPK_PREDS: 1
+  PREDICTIONS_PATH: 
+  WRONG_PRED_VIS:
+    ENABLE: False
+    SUBSET_PATH: 
+    TAG: Incorrectly classified videos.
+TEST:
+  BATCH_SIZE: 168
+  CHECKPOINT_FILE_PATH: /mnt/imslowfast/results/species_classification/disjoint_f=32/checkpoints/checkpoint_epoch_00048.pyth
+  CHECKPOINT_TYPE: pytorch
+  DATASET: kinetics
+  ENABLE: True
+  NUM_ENSEMBLE_VIEWS: 1
+  NUM_SPATIAL_CROPS: 1
+  NUM_TEMPORAL_CLIPS: [1]
+  RETURN_CAS: False
+  RETURN_FEATS: True
+  SAVE_RESULTS_PATH: 
+TRAIN:
+  AUTO_RESUME: True
+  BATCH_SIZE: 168
+  BG_MODEL_CHECKPOINT_FILE_PATH: 
+  BG_MODEL_CHECKPOINT_TYPE: pytorch
+  CHECKPOINT_CLEAR_NAME_PATTERN: ()
+  CHECKPOINT_EPOCH_RESET: False
+  CHECKPOINT_FILE_PATH: /mnt/imslowfast/weights/R50_IN1K.pyth
+  CHECKPOINT_INFLATE: True
+  CHECKPOINT_IN_INIT: False
+  CHECKPOINT_PERIOD: 5
+  CHECKPOINT_TYPE: pytorch
+  DATASET: kinetics
+  ENABLE: False
+  EVAL_PERIOD: 1
+  FG_MODEL_CHECKPOINT_FILE_PATH: 
+  FG_MODEL_CHECKPOINT_TYPE: pytorch
+  KILL_LOSS_EXPLOSION_FACTOR: 0.0
+  MIXED_PRECISION: True
+USE_SBATCH: False
+VIS_MASK:
+  ENABLE: False
+X3D:
+  BN_LIN5: False
+  BOTTLENECK_FACTOR: 1.0
+  CHANNELWISE_3x3x3: True
+  DEPTH_FACTOR: 1.0
+  DIM_C1: 12
+  DIM_C5: 2048
+  SCALE_RES2: False
+  WIDTH_FACTOR: 1.0
+[12/17 14:53:27][INFO] misc.py:  237: Model:
+DistributedDataParallel(
+  (module): ResNet(
+    (s1): VideoModelStem(
+      (pathway0_stem): ResNetBasicStem(
+        (conv): Conv3d(3, 64, kernel_size=(1, 7, 7), stride=(1, 2, 2), padding=(0, 3, 3), bias=False)
+        (bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (pool_layer): MaxPool3d(kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1], dilation=1, ceil_mode=False)
+      )
+    )
+    (s2): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+        (branch1_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(64, 64, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(64, 64, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(256, 64, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(64, 64, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(256, 64, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(64, 64, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (pathway0_pool): MaxPool3d(kernel_size=[1, 1, 1], stride=[1, 1, 1], padding=[0, 0, 0], dilation=1, ceil_mode=False)
+    (s3): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(256, 512, kernel_size=(1, 1, 1), stride=(1, 2, 2), bias=False)
+        (branch1_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(256, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res3): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (s4): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(512, 1024, kernel_size=(1, 1, 1), stride=(1, 2, 2), bias=False)
+        (branch1_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res3): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res4): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res5): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (s5): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(1024, 2048, kernel_size=(1, 1, 1), stride=(1, 2, 2), bias=False)
+        (branch1_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 512, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(512, 512, kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(512, 2048, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(2048, 512, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(512, 512, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(512, 2048, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(2048, 512, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(512, 512, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(512, 2048, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (head): ResNetBasicHead(
+      (predictors): ModuleList()
+      (pathway0_avgpool): AvgPool3d(kernel_size=[32, 8, 8], stride=1, padding=0)
+      (dropout): Dropout(p=0.5, inplace=False)
+      (projection): Linear(in_features=2048, out_features=16, bias=True)
+    )
+  )
+)
+[12/17 14:53:27][INFO] misc.py:  239: Params: 31,667,280
+[12/17 14:53:27][INFO] misc.py:  240: Mem: 0.23807382583618164 MB
+[12/17 14:53:28][WARNING] jit_analysis.py:  499: Unsupported operator aten::max_pool3d encountered 2 time(s)
+[12/17 14:53:28][WARNING] jit_analysis.py:  499: Unsupported operator aten::add encountered 16 time(s)
+[12/17 14:53:28][WARNING] jit_analysis.py:  499: Unsupported operator aten::avg_pool3d encountered 1 time(s)
+[12/17 14:53:28][INFO] misc.py:  242: Flops: 218.999324672 G
+[12/17 14:53:28][WARNING] jit_analysis.py:  499: Unsupported operator aten::batch_norm encountered 53 time(s)
+[12/17 14:53:28][WARNING] jit_analysis.py:  499: Unsupported operator aten::max_pool3d encountered 2 time(s)
+[12/17 14:53:28][WARNING] jit_analysis.py:  499: Unsupported operator aten::add encountered 16 time(s)
+[12/17 14:53:28][WARNING] jit_analysis.py:  499: Unsupported operator aten::avg_pool3d encountered 1 time(s)
+[12/17 14:53:28][INFO] misc.py:  243: Activations: 464.519184 M
+[12/17 14:53:28][INFO] misc.py:  248: nvidia-smi
+Tue Dec 17 14:53:29 2024       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.129.03             Driver Version: 535.129.03   CUDA Version: 12.3     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  GH200 120GB                    On  | 00000009:01:00.0 Off |                    0 |
+| N/A   25C    P0             134W / 900W |   6620MiB / 97871MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+|   1  GH200 120GB                    On  | 00000019:01:00.0 Off |                    0 |
+| N/A   26C    P0             144W / 900W |   2658MiB / 97871MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+|   2  GH200 120GB                    On  | 00000029:01:00.0 Off |                    0 |
+| N/A   24C    P0             130W / 900W |   2658MiB / 97871MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+|   3  GH200 120GB                    On  | 00000039:01:00.0 Off |                    0 |
+| N/A   25C    P0             123W / 900W |   2647MiB / 97871MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|    0   N/A  N/A    238704      C   /usr/bin/python                            6118MiB |
+|    1   N/A  N/A    238705      C   /usr/bin/python                            2250MiB |
+|    2   N/A  N/A    238706      C   /usr/bin/python                            2250MiB |
+|    3   N/A  N/A    238707      C   /usr/bin/python                            2146MiB |
++---------------------------------------------------------------------------------------+
+[12/17 14:53:30][INFO] misc.py:  237: Model:
+DistributedDataParallel(
+  (module): ResNet(
+    (s1): VideoModelStem(
+      (pathway0_stem): ResNetBasicStem(
+        (conv): Conv3d(3, 64, kernel_size=(1, 7, 7), stride=(1, 2, 2), padding=(0, 3, 3), bias=False)
+        (bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (pool_layer): MaxPool3d(kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1], dilation=1, ceil_mode=False)
+      )
+    )
+    (s2): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+        (branch1_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(64, 64, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(64, 64, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(256, 64, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(64, 64, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(256, 64, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(64, 64, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(64, 256, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (pathway0_pool): MaxPool3d(kernel_size=[1, 1, 1], stride=[1, 1, 1], padding=[0, 0, 0], dilation=1, ceil_mode=False)
+    (s3): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(256, 512, kernel_size=(1, 1, 1), stride=(1, 2, 2), bias=False)
+        (branch1_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(256, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res3): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 128, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (a_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(128, 128, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(128, 512, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (s4): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(512, 1024, kernel_size=(1, 1, 1), stride=(1, 2, 2), bias=False)
+        (branch1_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(512, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res3): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res4): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res5): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 256, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(256, 256, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(256, 1024, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (s5): ResStage(
+      (pathway0_res0): ResBlock(
+        (branch1): Conv3d(1024, 2048, kernel_size=(1, 1, 1), stride=(1, 2, 2), bias=False)
+        (branch1_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (branch2): BottleneckTransform(
+          (a): Conv3d(1024, 512, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(512, 512, kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(512, 2048, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res1): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(2048, 512, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(512, 512, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(512, 2048, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+      (pathway0_res2): ResBlock(
+        (branch2): BottleneckTransform(
+          (a): Conv3d(2048, 512, kernel_size=(3, 1, 1), stride=(1, 1, 1), padding=(1, 0, 0), bias=False)
+          (a_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (a_relu): ReLU(inplace=True)
+          (b): Conv3d(512, 512, kernel_size=(1, 3, 3), stride=(1, 1, 1), padding=(0, 1, 1), bias=False)
+          (b_bn): BatchNorm3d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (b_relu): ReLU(inplace=True)
+          (c): Conv3d(512, 2048, kernel_size=(1, 1, 1), stride=(1, 1, 1), bias=False)
+          (c_bn): BatchNorm3d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (relu): ReLU(inplace=True)
+      )
+    )
+    (head): ResNetBasicHead(
+      (predictors): ModuleList()
+      (pathway0_avgpool): AvgPool3d(kernel_size=[32, 8, 8], stride=1, padding=0)
+      (dropout): Dropout(p=0.5, inplace=False)
+      (projection): Linear(in_features=2048, out_features=16, bias=True)
+    )
+  )
+)
+[12/17 14:53:30][INFO] misc.py:  239: Params: 31,667,280
+[12/17 14:53:30][INFO] misc.py:  240: Mem: 4.002527713775635 MB
+[12/17 14:53:30][WARNING] jit_analysis.py:  499: Unsupported operator aten::max_pool3d encountered 2 time(s)
+[12/17 14:53:30][WARNING] jit_analysis.py:  499: Unsupported operator aten::add encountered 16 time(s)
+[12/17 14:53:30][WARNING] jit_analysis.py:  499: Unsupported operator aten::avg_pool3d encountered 1 time(s)
+[12/17 14:53:30][INFO] misc.py:  242: Flops: 218.999324672 G
+[12/17 14:53:30][WARNING] jit_analysis.py:  499: Unsupported operator aten::batch_norm encountered 53 time(s)
+[12/17 14:53:30][WARNING] jit_analysis.py:  499: Unsupported operator aten::max_pool3d encountered 2 time(s)
+[12/17 14:53:30][WARNING] jit_analysis.py:  499: Unsupported operator aten::add encountered 16 time(s)
+[12/17 14:53:30][WARNING] jit_analysis.py:  499: Unsupported operator aten::avg_pool3d encountered 1 time(s)
+[12/17 14:53:30][INFO] misc.py:  243: Activations: 464.519184 M
+[12/17 14:53:30][INFO] misc.py:  248: nvidia-smi
+Tue Dec 17 14:53:30 2024       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.129.03             Driver Version: 535.129.03   CUDA Version: 12.3     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  GH200 120GB                    On  | 00000009:01:00.0 Off |                    0 |
+| N/A   25C    P0             135W / 900W |   6620MiB / 97871MiB |      5%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+|   1  GH200 120GB                    On  | 00000019:01:00.0 Off |                    0 |
+| N/A   26C    P0             143W / 900W |   2658MiB / 97871MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+|   2  GH200 120GB                    On  | 00000029:01:00.0 Off |                    0 |
+| N/A   25C    P0             129W / 900W |   2658MiB / 97871MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+|   3  GH200 120GB                    On  | 00000039:01:00.0 Off |                    0 |
+| N/A   25C    P0             123W / 900W |   2647MiB / 97871MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|    0   N/A  N/A    238704      C   /usr/bin/python                            6118MiB |
+|    1   N/A  N/A    238705      C   /usr/bin/python                            2250MiB |
+|    2   N/A  N/A    238706      C   /usr/bin/python                            2250MiB |
+|    3   N/A  N/A    238707      C   /usr/bin/python                            2146MiB |
++---------------------------------------------------------------------------------------+
+[12/17 14:53:31][INFO] checkpoint.py:  222: Loading network weights from /mnt/imslowfast/results/species_classification/disjoint_f=32/checkpoints/checkpoint_epoch_00048.pyth.
+missing keys: []
+unexpected keys: []
+[12/17 14:53:31][INFO] kinetics.py:   92: Constructing Kinetics test...
+[12/17 14:53:31][INFO] kinetics.py:  164: Constructing kinetics dataloader (size: 54561 skip_rows 0) from /mnt/data/top_priority_annotations/kinetics/disjoint/test.csv 
+SAMPLING.BALANCED: False; BALANCE_TYPE: None
+[12/17 14:53:31][INFO] test_net.py:  307: Testing model for 325 iterations
+[12/17 14:53:31][INFO] tensorboard_vis.py:   52: To see logged results in Tensorboard, please launch using the command             `tensorboard  --port=<port-number> --logdir /mnt/imslowfast/results/species_classification/disjoint_f=32_test/runs-kinetics`
+[12/17 14:54:37][INFO] logging.py:   99: json_stats: {"cur_iter": "1", "eta": "5:54:57", "split": "test_iter", "time_diff": 65.53057}
+[12/17 14:54:37][INFO] logging.py:   99: json_stats: {"cur_iter": "2", "eta": "0:01:36", "split": "test_iter", "time_diff": 0.29737}
+[12/17 14:54:37][INFO] logging.py:   99: json_stats: {"cur_iter": "3", "eta": "0:01:37", "split": "test_iter", "time_diff": 0.30152}
+[12/17 14:54:38][INFO] logging.py:   99: json_stats: {"cur_iter": "4", "eta": "0:01:41", "split": "test_iter", "time_diff": 0.31386}
+[12/17 14:54:38][INFO] logging.py:   99: json_stats: {"cur_iter": "5", "eta": "0:01:40", "split": "test_iter", "time_diff": 0.31373}
+[12/17 14:54:38][INFO] logging.py:   99: json_stats: {"cur_iter": "6", "eta": "0:01:37", "split": "test_iter", "time_diff": 0.30417}
+[12/17 14:54:38][INFO] logging.py:   99: json_stats: {"cur_iter": "7", "eta": "0:01:38", "split": "test_iter", "time_diff": 0.30768}
+[12/17 14:54:39][INFO] logging.py:   99: json_stats: {"cur_iter": "8", "eta": "0:01:39", "split": "test_iter", "time_diff": 0.31386}
+[12/17 14:55:12][INFO] logging.py:   99: json_stats: {"cur_iter": "9", "eta": "2:57:00", "split": "test_iter", "time_diff": 33.50320}
+[12/17 14:55:13][INFO] logging.py:   99: json_stats: {"cur_iter": "10", "eta": "0:05:36", "split": "test_iter", "time_diff": 1.06541}
+[12/17 14:55:14][INFO] logging.py:   99: json_stats: {"cur_iter": "11", "eta": "0:01:35", "split": "test_iter", "time_diff": 0.30295}
+[12/17 14:55:15][INFO] logging.py:   99: json_stats: {"cur_iter": "12", "eta": "0:07:14", "split": "test_iter", "time_diff": 1.38257}
+[12/17 14:55:15][INFO] logging.py:   99: json_stats: {"cur_iter": "13", "eta": "0:01:34", "split": "test_iter", "time_diff": 0.30181}
+[12/17 14:55:16][INFO] logging.py:   99: json_stats: {"cur_iter": "14", "eta": "0:01:35", "split": "test_iter", "time_diff": 0.30572}
+[12/17 14:55:16][INFO] logging.py:   99: json_stats: {"cur_iter": "15", "eta": "0:01:39", "split": "test_iter", "time_diff": 0.31895}
+[12/17 14:55:16][INFO] logging.py:   99: json_stats: {"cur_iter": "16", "eta": "0:01:37", "split": "test_iter", "time_diff": 0.31485}
+[12/17 14:55:49][INFO] logging.py:   99: json_stats: {"cur_iter": "17", "eta": "2:47:33", "split": "test_iter", "time_diff": 32.53703}
+[12/17 14:55:55][INFO] logging.py:   99: json_stats: {"cur_iter": "18", "eta": "0:32:28", "split": "test_iter", "time_diff": 6.32676}
+[12/17 14:55:55][INFO] logging.py:   99: json_stats: {"cur_iter": "19", "eta": "0:01:32", "split": "test_iter", "time_diff": 0.30093}
+[12/17 14:55:56][INFO] logging.py:   99: json_stats: {"cur_iter": "20", "eta": "0:01:33", "split": "test_iter", "time_diff": 0.30652}
+[12/17 14:55:56][INFO] logging.py:   99: json_stats: {"cur_iter": "21", "eta": "0:01:37", "split": "test_iter", "time_diff": 0.32022}
+[12/17 14:55:56][INFO] logging.py:   99: json_stats: {"cur_iter": "22", "eta": "0:01:37", "split": "test_iter", "time_diff": 0.31950}
+[12/17 14:55:57][INFO] logging.py:   99: json_stats: {"cur_iter": "23", "eta": "0:01:33", "split": "test_iter", "time_diff": 0.30881}
+[12/17 14:55:57][INFO] logging.py:   99: json_stats: {"cur_iter": "24", "eta": "0:01:35", "split": "test_iter", "time_diff": 0.31519}
+[12/17 14:56:22][INFO] logging.py:   99: json_stats: {"cur_iter": "25", "eta": "2:03:34", "split": "test_iter", "time_diff": 24.63231}
+[12/17 14:56:33][INFO] logging.py:   99: json_stats: {"cur_iter": "26", "eta": "0:57:13", "split": "test_iter", "time_diff": 11.44391}
+[12/17 14:56:33][INFO] logging.py:   99: json_stats: {"cur_iter": "27", "eta": "0:01:29", "split": "test_iter", "time_diff": 0.29806}
+[12/17 14:56:34][INFO] logging.py:   99: json_stats: {"cur_iter": "28", "eta": "0:01:29", "split": "test_iter", "time_diff": 0.30064}
+[12/17 14:56:34][INFO] logging.py:   99: json_stats: {"cur_iter": "29", "eta": "0:01:32", "split": "test_iter", "time_diff": 0.31188}
+[12/17 14:56:34][INFO] logging.py:   99: json_stats: {"cur_iter": "30", "eta": "0:01:32", "split": "test_iter", "time_diff": 0.31317}
+[12/17 14:56:35][INFO] logging.py:   99: json_stats: {"cur_iter": "31", "eta": "0:01:30", "split": "test_iter", "time_diff": 0.30653}
+[12/17 14:56:35][INFO] logging.py:   99: json_stats: {"cur_iter": "32", "eta": "0:01:30", "split": "test_iter", "time_diff": 0.30748}
+[12/17 14:56:57][INFO] logging.py:   99: json_stats: {"cur_iter": "33", "eta": "1:45:05", "split": "test_iter", "time_diff": 21.52109}
+[12/17 14:57:07][INFO] logging.py:   99: json_stats: {"cur_iter": "34", "eta": "0:52:55", "split": "test_iter", "time_diff": 10.87631}
+[12/17 14:57:08][INFO] logging.py:   99: json_stats: {"cur_iter": "35", "eta": "0:01:26", "split": "test_iter", "time_diff": 0.29821}
+[12/17 14:57:08][INFO] logging.py:   99: json_stats: {"cur_iter": "36", "eta": "0:01:26", "split": "test_iter", "time_diff": 0.29944}
+[12/17 14:57:10][INFO] logging.py:   99: json_stats: {"cur_iter": "37", "eta": "0:08:07", "split": "test_iter", "time_diff": 1.68812}
+[12/17 14:57:10][INFO] logging.py:   99: json_stats: {"cur_iter": "38", "eta": "0:01:25", "split": "test_iter", "time_diff": 0.29780}
+[12/17 14:57:10][INFO] logging.py:   99: json_stats: {"cur_iter": "39", "eta": "0:01:27", "split": "test_iter", "time_diff": 0.30351}
+[12/17 14:57:11][INFO] logging.py:   99: json_stats: {"cur_iter": "40", "eta": "0:01:29", "split": "test_iter", "time_diff": 0.31399}
+[12/17 14:57:31][INFO] logging.py:   99: json_stats: {"cur_iter": "41", "eta": "1:38:04", "split": "test_iter", "time_diff": 20.64625}
+[12/17 14:57:40][INFO] logging.py:   99: json_stats: {"cur_iter": "42", "eta": "0:39:04", "split": "test_iter", "time_diff": 8.25482}
+[12/17 14:57:40][INFO] logging.py:   99: json_stats: {"cur_iter": "43", "eta": "0:01:23", "split": "test_iter", "time_diff": 0.29634}
+[12/17 14:57:40][INFO] logging.py:   99: json_stats: {"cur_iter": "44", "eta": "0:01:25", "split": "test_iter", "time_diff": 0.30145}
+[12/17 14:57:43][INFO] logging.py:   99: json_stats: {"cur_iter": "45", "eta": "0:12:35", "split": "test_iter", "time_diff": 2.68948}
+[12/17 14:57:45][INFO] logging.py:   99: json_stats: {"cur_iter": "46", "eta": "0:08:02", "split": "test_iter", "time_diff": 1.72491}
+[12/17 14:57:45][INFO] logging.py:   99: json_stats: {"cur_iter": "47", "eta": "0:01:23", "split": "test_iter", "time_diff": 0.29855}
+[12/17 14:57:45][INFO] logging.py:   99: json_stats: {"cur_iter": "48", "eta": "0:01:24", "split": "test_iter", "time_diff": 0.30349}
+[12/17 14:58:11][INFO] logging.py:   99: json_stats: {"cur_iter": "49", "eta": "1:57:44", "split": "test_iter", "time_diff": 25.50416}
+[12/17 14:58:18][INFO] logging.py:   99: json_stats: {"cur_iter": "50", "eta": "0:32:47", "split": "test_iter", "time_diff": 7.12705}
+[12/17 14:58:18][INFO] logging.py:   99: json_stats: {"cur_iter": "51", "eta": "0:01:21", "split": "test_iter", "time_diff": 0.29777}
+[12/17 14:58:18][INFO] logging.py:   99: json_stats: {"cur_iter": "52", "eta": "0:01:22", "split": "test_iter", "time_diff": 0.30195}
+[12/17 14:58:19][INFO] logging.py:   99: json_stats: {"cur_iter": "53", "eta": "0:01:24", "split": "test_iter", "time_diff": 0.30901}
+[12/17 14:58:19][INFO] logging.py:   99: json_stats: {"cur_iter": "54", "eta": "0:01:25", "split": "test_iter", "time_diff": 0.31279}
+[12/17 14:58:19][INFO] logging.py:   99: json_stats: {"cur_iter": "55", "eta": "0:01:22", "split": "test_iter", "time_diff": 0.30495}
+[12/17 14:58:20][INFO] logging.py:   99: json_stats: {"cur_iter": "56", "eta": "0:01:22", "split": "test_iter", "time_diff": 0.30726}
+[12/17 14:58:45][INFO] logging.py:   99: json_stats: {"cur_iter": "57", "eta": "1:52:55", "split": "test_iter", "time_diff": 25.18746}
+[12/17 14:58:54][INFO] logging.py:   99: json_stats: {"cur_iter": "58", "eta": "0:42:12", "split": "test_iter", "time_diff": 9.45039}
+[12/17 14:58:57][INFO] logging.py:   99: json_stats: {"cur_iter": "59", "eta": "0:11:34", "split": "test_iter", "time_diff": 2.60210}
+[12/17 14:58:57][INFO] logging.py:   99: json_stats: {"cur_iter": "60", "eta": "0:01:19", "split": "test_iter", "time_diff": 0.30018}
+[12/17 14:58:58][INFO] logging.py:   99: json_stats: {"cur_iter": "61", "eta": "0:01:20", "split": "test_iter", "time_diff": 0.30512}
+[12/17 14:58:58][INFO] logging.py:   99: json_stats: {"cur_iter": "62", "eta": "0:01:23", "split": "test_iter", "time_diff": 0.31498}
+[12/17 14:58:58][INFO] logging.py:   99: json_stats: {"cur_iter": "63", "eta": "0:01:23", "split": "test_iter", "time_diff": 0.31598}
+[12/17 14:58:58][INFO] logging.py:   99: json_stats: {"cur_iter": "64", "eta": "0:01:20", "split": "test_iter", "time_diff": 0.30851}
+[12/17 14:59:22][INFO] logging.py:   99: json_stats: {"cur_iter": "65", "eta": "1:42:24", "split": "test_iter", "time_diff": 23.54081}
+[12/17 14:59:32][INFO] logging.py:   99: json_stats: {"cur_iter": "66", "eta": "0:43:48", "split": "test_iter", "time_diff": 10.11039}
+[12/17 14:59:34][INFO] logging.py:   99: json_stats: {"cur_iter": "67", "eta": "0:08:12", "split": "test_iter", "time_diff": 1.90247}
+[12/17 14:59:34][INFO] logging.py:   99: json_stats: {"cur_iter": "68", "eta": "0:01:16", "split": "test_iter", "time_diff": 0.29810}
+[12/17 14:59:35][INFO] logging.py:   99: json_stats: {"cur_iter": "69", "eta": "0:01:17", "split": "test_iter", "time_diff": 0.30063}
+[12/17 14:59:35][INFO] logging.py:   99: json_stats: {"cur_iter": "70", "eta": "0:01:19", "split": "test_iter", "time_diff": 0.31071}
+[12/17 14:59:35][INFO] logging.py:   99: json_stats: {"cur_iter": "71", "eta": "0:01:19", "split": "test_iter", "time_diff": 0.31070}
+[12/17 14:59:36][INFO] logging.py:   99: json_stats: {"cur_iter": "72", "eta": "0:01:17", "split": "test_iter", "time_diff": 0.30550}
+[12/17 14:59:58][INFO] logging.py:   99: json_stats: {"cur_iter": "73", "eta": "1:35:02", "split": "test_iter", "time_diff": 22.54066}
+[12/17 15:00:07][INFO] logging.py:   99: json_stats: {"cur_iter": "74", "eta": "0:37:35", "split": "test_iter", "time_diff": 8.95223}
+[12/17 15:00:12][INFO] logging.py:   99: json_stats: {"cur_iter": "75", "eta": "0:18:30", "split": "test_iter", "time_diff": 4.42379}
+[12/17 15:00:12][INFO] logging.py:   99: json_stats: {"cur_iter": "76", "eta": "0:01:14", "split": "test_iter", "time_diff": 0.29712}
+[12/17 15:00:12][INFO] logging.py:   99: json_stats: {"cur_iter": "77", "eta": "0:01:15", "split": "test_iter", "time_diff": 0.30192}
+[12/17 15:00:13][INFO] logging.py:   99: json_stats: {"cur_iter": "78", "eta": "0:01:54", "split": "test_iter", "time_diff": 0.46052}
+[12/17 15:00:13][INFO] logging.py:   99: json_stats: {"cur_iter": "79", "eta": "0:01:13", "split": "test_iter", "time_diff": 0.29730}
+[12/17 15:00:13][INFO] logging.py:   99: json_stats: {"cur_iter": "80", "eta": "0:01:13", "split": "test_iter", "time_diff": 0.30011}
+[12/17 15:00:38][INFO] logging.py:   99: json_stats: {"cur_iter": "81", "eta": "1:40:05", "split": "test_iter", "time_diff": 24.51120}
+[12/17 15:00:44][INFO] logging.py:   99: json_stats: {"cur_iter": "82", "eta": "0:26:35", "split": "test_iter", "time_diff": 6.53690}
+[12/17 15:00:47][INFO] logging.py:   99: json_stats: {"cur_iter": "83", "eta": "0:12:04", "split": "test_iter", "time_diff": 2.97969}
+[12/17 15:00:48][INFO] logging.py:   99: json_stats: {"cur_iter": "84", "eta": "0:01:11", "split": "test_iter", "time_diff": 0.29719}
+[12/17 15:00:48][INFO] logging.py:   99: json_stats: {"cur_iter": "85", "eta": "0:01:12", "split": "test_iter", "time_diff": 0.30138}
+[12/17 15:00:50][INFO] logging.py:   99: json_stats: {"cur_iter": "86", "eta": "0:08:39", "split": "test_iter", "time_diff": 2.16503}
+[12/17 15:00:50][INFO] logging.py:   99: json_stats: {"cur_iter": "87", "eta": "0:01:10", "split": "test_iter", "time_diff": 0.29620}
+[12/17 15:00:51][INFO] logging.py:   99: json_stats: {"cur_iter": "88", "eta": "0:01:11", "split": "test_iter", "time_diff": 0.30207}
+[12/17 15:01:15][INFO] logging.py:   99: json_stats: {"cur_iter": "89", "eta": "1:37:05", "split": "test_iter", "time_diff": 24.58098}
+[12/17 15:01:19][INFO] logging.py:   99: json_stats: {"cur_iter": "90", "eta": "0:14:11", "split": "test_iter", "time_diff": 3.60840}
+[12/17 15:01:24][INFO] logging.py:   99: json_stats: {"cur_iter": "91", "eta": "0:22:19", "split": "test_iter", "time_diff": 5.70117}
+[12/17 15:01:25][INFO] logging.py:   99: json_stats: {"cur_iter": "92", "eta": "0:01:09", "split": "test_iter", "time_diff": 0.29592}
+[12/17 15:01:25][INFO] logging.py:   99: json_stats: {"cur_iter": "93", "eta": "0:01:10", "split": "test_iter", "time_diff": 0.30138}
+[12/17 15:01:27][INFO] logging.py:   99: json_stats: {"cur_iter": "94", "eta": "0:07:16", "split": "test_iter", "time_diff": 1.88293}
+[12/17 15:01:27][INFO] logging.py:   99: json_stats: {"cur_iter": "95", "eta": "0:01:08", "split": "test_iter", "time_diff": 0.29492}
+[12/17 15:01:28][INFO] logging.py:   99: json_stats: {"cur_iter": "96", "eta": "0:01:09", "split": "test_iter", "time_diff": 0.30036}
+[12/17 15:01:55][INFO] logging.py:   99: json_stats: {"cur_iter": "97", "eta": "1:44:17", "split": "test_iter", "time_diff": 27.32681}
+[12/17 15:01:55][INFO] logging.py:   99: json_stats: {"cur_iter": "98", "eta": "0:01:08", "split": "test_iter", "time_diff": 0.30191}
+[12/17 15:02:00][INFO] logging.py:   99: json_stats: {"cur_iter": "99", "eta": "0:17:50", "split": "test_iter", "time_diff": 4.71630}
+[12/17 15:02:00][INFO] logging.py:   99: json_stats: {"cur_iter": "100", "eta": "0:01:07", "split": "test_iter", "time_diff": 0.29771}
+[12/17 15:02:01][INFO] logging.py:   99: json_stats: {"cur_iter": "101", "eta": "0:01:07", "split": "test_iter", "time_diff": 0.30132}
+[12/17 15:02:06][INFO] logging.py:   99: json_stats: {"cur_iter": "102", "eta": "0:21:29", "split": "test_iter", "time_diff": 5.75672}
+[12/17 15:02:07][INFO] logging.py:   99: json_stats: {"cur_iter": "103", "eta": "0:01:06", "split": "test_iter", "time_diff": 0.29612}
+[12/17 15:02:07][INFO] logging.py:   99: json_stats: {"cur_iter": "104", "eta": "0:01:06", "split": "test_iter", "time_diff": 0.29973}
+[12/17 15:02:32][INFO] logging.py:   99: json_stats: {"cur_iter": "105", "eta": "1:30:57", "split": "test_iter", "time_diff": 24.69545}
+[12/17 15:02:32][INFO] logging.py:   99: json_stats: {"cur_iter": "106", "eta": "0:01:05", "split": "test_iter", "time_diff": 0.29990}
+[12/17 15:02:34][INFO] logging.py:   99: json_stats: {"cur_iter": "107", "eta": "0:07:19", "split": "test_iter", "time_diff": 2.00523}
+[12/17 15:02:34][INFO] logging.py:   99: json_stats: {"cur_iter": "108", "eta": "0:01:05", "split": "test_iter", "time_diff": 0.30146}
+[12/17 15:02:35][INFO] logging.py:   99: json_stats: {"cur_iter": "109", "eta": "0:01:05", "split": "test_iter", "time_diff": 0.30197}
+[12/17 15:02:45][INFO] logging.py:   99: json_stats: {"cur_iter": "110", "eta": "0:37:22", "split": "test_iter", "time_diff": 10.38192}
+[12/17 15:02:45][INFO] logging.py:   99: json_stats: {"cur_iter": "111", "eta": "0:01:03", "split": "test_iter", "time_diff": 0.29529}
+[12/17 15:02:46][INFO] logging.py:   99: json_stats: {"cur_iter": "112", "eta": "0:01:04", "split": "test_iter", "time_diff": 0.30073}
+[12/17 15:03:11][INFO] logging.py:   99: json_stats: {"cur_iter": "113", "eta": "1:31:32", "split": "test_iter", "time_diff": 25.78584}
+[12/17 15:03:12][INFO] logging.py:   99: json_stats: {"cur_iter": "114", "eta": "0:01:03", "split": "test_iter", "time_diff": 0.30000}
+[12/17 15:03:12][INFO] logging.py:   99: json_stats: {"cur_iter": "115", "eta": "0:01:04", "split": "test_iter", "time_diff": 0.30643}
+[12/17 15:03:12][INFO] logging.py:   99: json_stats: {"cur_iter": "116", "eta": "0:01:06", "split": "test_iter", "time_diff": 0.31523}
+[12/17 15:03:13][INFO] logging.py:   99: json_stats: {"cur_iter": "117", "eta": "0:01:03", "split": "test_iter", "time_diff": 0.30527}
+[12/17 15:03:21][INFO] logging.py:   99: json_stats: {"cur_iter": "118", "eta": "0:27:53", "split": "test_iter", "time_diff": 8.04495}
+[12/17 15:03:21][INFO] logging.py:   99: json_stats: {"cur_iter": "119", "eta": "0:01:01", "split": "test_iter", "time_diff": 0.29625}
+[12/17 15:03:21][INFO] logging.py:   99: json_stats: {"cur_iter": "120", "eta": "0:01:01", "split": "test_iter", "time_diff": 0.30094}
+[12/17 15:03:50][INFO] logging.py:   99: json_stats: {"cur_iter": "121", "eta": "1:37:19", "split": "test_iter", "time_diff": 28.48482}
+[12/17 15:03:50][INFO] logging.py:   99: json_stats: {"cur_iter": "122", "eta": "0:01:00", "split": "test_iter", "time_diff": 0.29614}
+[12/17 15:03:50][INFO] logging.py:   99: json_stats: {"cur_iter": "123", "eta": "0:01:01", "split": "test_iter", "time_diff": 0.30119}
+[12/17 15:03:51][INFO] logging.py:   99: json_stats: {"cur_iter": "124", "eta": "0:01:02", "split": "test_iter", "time_diff": 0.30973}
+[12/17 15:03:51][INFO] logging.py:   99: json_stats: {"cur_iter": "125", "eta": "0:01:02", "split": "test_iter", "time_diff": 0.30994}
+[12/17 15:03:56][INFO] logging.py:   99: json_stats: {"cur_iter": "126", "eta": "0:15:20", "split": "test_iter", "time_diff": 4.60027}
+[12/17 15:03:56][INFO] logging.py:   99: json_stats: {"cur_iter": "127", "eta": "0:00:59", "split": "test_iter", "time_diff": 0.29707}
+[12/17 15:03:56][INFO] logging.py:   99: json_stats: {"cur_iter": "128", "eta": "0:01:00", "split": "test_iter", "time_diff": 0.30450}
+[12/17 15:04:27][INFO] logging.py:   99: json_stats: {"cur_iter": "129", "eta": "1:41:22", "split": "test_iter", "time_diff": 30.87789}
+[12/17 15:04:27][INFO] logging.py:   99: json_stats: {"cur_iter": "130", "eta": "0:00:58", "split": "test_iter", "time_diff": 0.29980}
+[12/17 15:04:28][INFO] logging.py:   99: json_stats: {"cur_iter": "131", "eta": "0:00:58", "split": "test_iter", "time_diff": 0.29989}
+[12/17 15:04:28][INFO] logging.py:   99: json_stats: {"cur_iter": "132", "eta": "0:00:59", "split": "test_iter", "time_diff": 0.30687}
+[12/17 15:04:29][INFO] logging.py:   99: json_stats: {"cur_iter": "133", "eta": "0:02:44", "split": "test_iter", "time_diff": 0.85047}
+[12/17 15:04:33][INFO] logging.py:   99: json_stats: {"cur_iter": "134", "eta": "0:12:41", "split": "test_iter", "time_diff": 3.96875}
+[12/17 15:04:33][INFO] logging.py:   99: json_stats: {"cur_iter": "135", "eta": "0:00:56", "split": "test_iter", "time_diff": 0.29775}
+[12/17 15:04:33][INFO] logging.py:   99: json_stats: {"cur_iter": "136", "eta": "0:00:57", "split": "test_iter", "time_diff": 0.30049}
+[12/17 15:05:01][INFO] logging.py:   99: json_stats: {"cur_iter": "137", "eta": "1:27:39", "split": "test_iter", "time_diff": 27.82981}
+[12/17 15:05:01][INFO] logging.py:   99: json_stats: {"cur_iter": "138", "eta": "0:00:56", "split": "test_iter", "time_diff": 0.29973}
+[12/17 15:05:04][INFO] logging.py:   99: json_stats: {"cur_iter": "139", "eta": "0:06:29", "split": "test_iter", "time_diff": 2.08545}
+[12/17 15:05:04][INFO] logging.py:   99: json_stats: {"cur_iter": "140", "eta": "0:00:55", "split": "test_iter", "time_diff": 0.29574}
+[12/17 15:05:09][INFO] logging.py:   99: json_stats: {"cur_iter": "141", "eta": "0:14:30", "split": "test_iter", "time_diff": 4.70794}
+[12/17 15:05:12][INFO] logging.py:   99: json_stats: {"cur_iter": "142", "eta": "0:10:38", "split": "test_iter", "time_diff": 3.47197}
+[12/17 15:05:12][INFO] logging.py:   99: json_stats: {"cur_iter": "143", "eta": "0:00:54", "split": "test_iter", "time_diff": 0.29639}
+[12/17 15:05:13][INFO] logging.py:   99: json_stats: {"cur_iter": "144", "eta": "0:00:54", "split": "test_iter", "time_diff": 0.30150}
+[12/17 15:05:40][INFO] logging.py:   99: json_stats: {"cur_iter": "145", "eta": "1:22:47", "split": "test_iter", "time_diff": 27.44314}
+[12/17 15:05:40][INFO] logging.py:   99: json_stats: {"cur_iter": "146", "eta": "0:00:53", "split": "test_iter", "time_diff": 0.29970}
+[12/17 15:05:41][INFO] logging.py:   99: json_stats: {"cur_iter": "147", "eta": "0:00:53", "split": "test_iter", "time_diff": 0.30039}
+[12/17 15:05:41][INFO] logging.py:   99: json_stats: {"cur_iter": "148", "eta": "0:00:55", "split": "test_iter", "time_diff": 0.30926}
+[12/17 15:05:48][INFO] logging.py:   99: json_stats: {"cur_iter": "149", "eta": "0:19:55", "split": "test_iter", "time_diff": 6.75411}
+[12/17 15:05:53][INFO] logging.py:   99: json_stats: {"cur_iter": "150", "eta": "0:16:42", "split": "test_iter", "time_diff": 5.69494}
+[12/17 15:05:54][INFO] logging.py:   99: json_stats: {"cur_iter": "151", "eta": "0:00:51", "split": "test_iter", "time_diff": 0.29663}
+[12/17 15:05:54][INFO] logging.py:   99: json_stats: {"cur_iter": "152", "eta": "0:00:52", "split": "test_iter", "time_diff": 0.30067}
+[12/17 15:06:18][INFO] logging.py:   99: json_stats: {"cur_iter": "153", "eta": "1:08:01", "split": "test_iter", "time_diff": 23.59355}
+[12/17 15:06:18][INFO] logging.py:   99: json_stats: {"cur_iter": "154", "eta": "0:01:06", "split": "test_iter", "time_diff": 0.38558}
+[12/17 15:06:19][INFO] logging.py:   99: json_stats: {"cur_iter": "155", "eta": "0:01:16", "split": "test_iter", "time_diff": 0.44585}
+[12/17 15:06:19][INFO] logging.py:   99: json_stats: {"cur_iter": "156", "eta": "0:00:51", "split": "test_iter", "time_diff": 0.30070}
+[12/17 15:06:27][INFO] logging.py:   99: json_stats: {"cur_iter": "157", "eta": "0:23:45", "split": "test_iter", "time_diff": 8.43289}
+[12/17 15:06:32][INFO] logging.py:   99: json_stats: {"cur_iter": "158", "eta": "0:13:25", "split": "test_iter", "time_diff": 4.79633}
+[12/17 15:06:32][INFO] logging.py:   99: json_stats: {"cur_iter": "159", "eta": "0:00:49", "split": "test_iter", "time_diff": 0.29525}
+[12/17 15:06:33][INFO] logging.py:   99: json_stats: {"cur_iter": "160", "eta": "0:00:50", "split": "test_iter", "time_diff": 0.30267}
+[12/17 15:06:55][INFO] logging.py:   99: json_stats: {"cur_iter": "161", "eta": "1:00:48", "split": "test_iter", "time_diff": 22.11128}
+[12/17 15:06:55][INFO] logging.py:   99: json_stats: {"cur_iter": "162", "eta": "0:00:48", "split": "test_iter", "time_diff": 0.29581}
+[12/17 15:06:58][INFO] logging.py:   99: json_stats: {"cur_iter": "163", "eta": "0:06:38", "split": "test_iter", "time_diff": 2.44339}
+[12/17 15:06:58][INFO] logging.py:   99: json_stats: {"cur_iter": "164", "eta": "0:00:47", "split": "test_iter", "time_diff": 0.29533}
+[12/17 15:07:05][INFO] logging.py:   99: json_stats: {"cur_iter": "165", "eta": "0:20:23", "split": "test_iter", "time_diff": 7.59928}
+[12/17 15:07:07][INFO] logging.py:   99: json_stats: {"cur_iter": "166", "eta": "0:04:08", "split": "test_iter", "time_diff": 1.55044}
+[12/17 15:07:07][INFO] logging.py:   99: json_stats: {"cur_iter": "167", "eta": "0:00:48", "split": "test_iter", "time_diff": 0.30229}
+[12/17 15:07:08][INFO] logging.py:   99: json_stats: {"cur_iter": "168", "eta": "0:00:48", "split": "test_iter", "time_diff": 0.30757}
+[12/17 15:07:32][INFO] logging.py:   99: json_stats: {"cur_iter": "169", "eta": "1:03:17", "split": "test_iter", "time_diff": 24.18706}
+[12/17 15:07:32][INFO] logging.py:   99: json_stats: {"cur_iter": "170", "eta": "0:00:46", "split": "test_iter", "time_diff": 0.30012}
+[12/17 15:07:33][INFO] logging.py:   99: json_stats: {"cur_iter": "171", "eta": "0:02:08", "split": "test_iter", "time_diff": 0.83210}
+[12/17 15:07:33][INFO] logging.py:   99: json_stats: {"cur_iter": "172", "eta": "0:00:45", "split": "test_iter", "time_diff": 0.29658}
+[12/17 15:07:40][INFO] logging.py:   99: json_stats: {"cur_iter": "173", "eta": "0:17:18", "split": "test_iter", "time_diff": 6.78990}
+[12/17 15:07:46][INFO] logging.py:   99: json_stats: {"cur_iter": "174", "eta": "0:14:35", "split": "test_iter", "time_diff": 5.75930}
+[12/17 15:07:46][INFO] logging.py:   99: json_stats: {"cur_iter": "175", "eta": "0:00:44", "split": "test_iter", "time_diff": 0.29646}
+[12/17 15:07:46][INFO] logging.py:   99: json_stats: {"cur_iter": "176", "eta": "0:00:45", "split": "test_iter", "time_diff": 0.30045}
+[12/17 15:08:15][INFO] logging.py:   99: json_stats: {"cur_iter": "177", "eta": "1:11:42", "split": "test_iter", "time_diff": 28.87315}
+[12/17 15:08:16][INFO] logging.py:   99: json_stats: {"cur_iter": "178", "eta": "0:00:44", "split": "test_iter", "time_diff": 0.29918}
+[12/17 15:08:16][INFO] logging.py:   99: json_stats: {"cur_iter": "179", "eta": "0:00:44", "split": "test_iter", "time_diff": 0.30236}
+[12/17 15:08:16][INFO] logging.py:   99: json_stats: {"cur_iter": "180", "eta": "0:00:44", "split": "test_iter", "time_diff": 0.30670}
+[12/17 15:08:18][INFO] logging.py:   99: json_stats: {"cur_iter": "181", "eta": "0:03:55", "split": "test_iter", "time_diff": 1.62209}
+[12/17 15:08:21][INFO] logging.py:   99: json_stats: {"cur_iter": "182", "eta": "0:08:23", "split": "test_iter", "time_diff": 3.49330}
+[12/17 15:08:22][INFO] logging.py:   99: json_stats: {"cur_iter": "183", "eta": "0:00:42", "split": "test_iter", "time_diff": 0.29573}
+[12/17 15:08:22][INFO] logging.py:   99: json_stats: {"cur_iter": "184", "eta": "0:00:42", "split": "test_iter", "time_diff": 0.30001}
+[12/17 15:08:51][INFO] logging.py:   99: json_stats: {"cur_iter": "185", "eta": "1:08:54", "split": "test_iter", "time_diff": 29.31924}
+[12/17 15:08:51][INFO] logging.py:   99: json_stats: {"cur_iter": "186", "eta": "0:00:41", "split": "test_iter", "time_diff": 0.29676}
+[12/17 15:08:53][INFO] logging.py:   99: json_stats: {"cur_iter": "187", "eta": "0:04:14", "split": "test_iter", "time_diff": 1.83259}
+[12/17 15:08:54][INFO] logging.py:   99: json_stats: {"cur_iter": "188", "eta": "0:00:40", "split": "test_iter", "time_diff": 0.29445}
+[12/17 15:08:54][INFO] logging.py:   99: json_stats: {"cur_iter": "189", "eta": "0:00:41", "split": "test_iter", "time_diff": 0.29974}
+[12/17 15:08:59][INFO] logging.py:   99: json_stats: {"cur_iter": "190", "eta": "0:12:30", "split": "test_iter", "time_diff": 5.51576}
+[12/17 15:09:00][INFO] logging.py:   99: json_stats: {"cur_iter": "191", "eta": "0:00:39", "split": "test_iter", "time_diff": 0.29436}
+[12/17 15:09:00][INFO] logging.py:   99: json_stats: {"cur_iter": "192", "eta": "0:00:40", "split": "test_iter", "time_diff": 0.29929}
+[12/17 15:09:33][INFO] logging.py:   99: json_stats: {"cur_iter": "193", "eta": "1:12:35", "split": "test_iter", "time_diff": 32.74566}
+[12/17 15:09:33][INFO] logging.py:   99: json_stats: {"cur_iter": "194", "eta": "0:00:55", "split": "test_iter", "time_diff": 0.42383}
+[12/17 15:09:34][INFO] logging.py:   99: json_stats: {"cur_iter": "195", "eta": "0:00:38", "split": "test_iter", "time_diff": 0.29315}
+[12/17 15:09:34][INFO] logging.py:   99: json_stats: {"cur_iter": "196", "eta": "0:00:38", "split": "test_iter", "time_diff": 0.29868}
+[12/17 15:09:34][INFO] logging.py:   99: json_stats: {"cur_iter": "197", "eta": "0:00:39", "split": "test_iter", "time_diff": 0.30854}
+[12/17 15:09:34][INFO] logging.py:   99: json_stats: {"cur_iter": "198", "eta": "0:00:39", "split": "test_iter", "time_diff": 0.31086}
+[12/17 15:09:35][INFO] logging.py:   99: json_stats: {"cur_iter": "199", "eta": "0:00:39", "split": "test_iter", "time_diff": 0.30883}
+[12/17 15:09:37][INFO] logging.py:   99: json_stats: {"cur_iter": "200", "eta": "0:03:46", "split": "test_iter", "time_diff": 1.79609}
+[12/17 15:10:12][INFO] logging.py:   99: json_stats: {"cur_iter": "201", "eta": "1:12:54", "split": "test_iter", "time_diff": 34.99586}
+[12/17 15:10:12][INFO] logging.py:   99: json_stats: {"cur_iter": "202", "eta": "0:00:36", "split": "test_iter", "time_diff": 0.29201}
+[12/17 15:10:12][INFO] logging.py:   99: json_stats: {"cur_iter": "203", "eta": "0:00:36", "split": "test_iter", "time_diff": 0.29771}
+[12/17 15:10:12][INFO] logging.py:   99: json_stats: {"cur_iter": "204", "eta": "0:00:37", "split": "test_iter", "time_diff": 0.30490}
+[12/17 15:10:13][INFO] logging.py:   99: json_stats: {"cur_iter": "205", "eta": "0:00:37", "split": "test_iter", "time_diff": 0.31316}
+[12/17 15:10:13][INFO] logging.py:   99: json_stats: {"cur_iter": "206", "eta": "0:00:36", "split": "test_iter", "time_diff": 0.30303}
+[12/17 15:10:14][INFO] logging.py:   99: json_stats: {"cur_iter": "207", "eta": "0:01:34", "split": "test_iter", "time_diff": 0.79184}
+[12/17 15:10:14][INFO] logging.py:   99: json_stats: {"cur_iter": "208", "eta": "0:00:34", "split": "test_iter", "time_diff": 0.29419}
+[12/17 15:10:51][INFO] logging.py:   99: json_stats: {"cur_iter": "209", "eta": "1:10:50", "split": "test_iter", "time_diff": 36.32972}
+[12/17 15:10:51][INFO] logging.py:   99: json_stats: {"cur_iter": "210", "eta": "0:00:33", "split": "test_iter", "time_diff": 0.29192}
+[12/17 15:10:51][INFO] logging.py:   99: json_stats: {"cur_iter": "211", "eta": "0:00:35", "split": "test_iter", "time_diff": 0.30809}
+[12/17 15:10:51][INFO] logging.py:   99: json_stats: {"cur_iter": "212", "eta": "0:00:34", "split": "test_iter", "time_diff": 0.30369}
+[12/17 15:10:52][INFO] logging.py:   99: json_stats: {"cur_iter": "213", "eta": "0:00:35", "split": "test_iter", "time_diff": 0.31166}
+[12/17 15:10:52][INFO] logging.py:   99: json_stats: {"cur_iter": "214", "eta": "0:00:33", "split": "test_iter", "time_diff": 0.30262}
+[12/17 15:10:55][INFO] logging.py:   99: json_stats: {"cur_iter": "215", "eta": "0:04:56", "split": "test_iter", "time_diff": 2.67358}
+[12/17 15:10:55][INFO] logging.py:   99: json_stats: {"cur_iter": "216", "eta": "0:00:32", "split": "test_iter", "time_diff": 0.29469}
+[12/17 15:11:28][INFO] logging.py:   99: json_stats: {"cur_iter": "217", "eta": "0:59:03", "split": "test_iter", "time_diff": 32.50855}
+[12/17 15:11:28][INFO] logging.py:   99: json_stats: {"cur_iter": "218", "eta": "0:00:31", "split": "test_iter", "time_diff": 0.29453}
+[12/17 15:11:34][INFO] logging.py:   99: json_stats: {"cur_iter": "219", "eta": "0:10:30", "split": "test_iter", "time_diff": 5.89332}
+[12/17 15:11:34][INFO] logging.py:   99: json_stats: {"cur_iter": "220", "eta": "0:00:32", "split": "test_iter", "time_diff": 0.30354}
+[12/17 15:11:34][INFO] logging.py:   99: json_stats: {"cur_iter": "221", "eta": "0:00:32", "split": "test_iter", "time_diff": 0.30610}
+[12/17 15:11:35][INFO] logging.py:   99: json_stats: {"cur_iter": "222", "eta": "0:00:31", "split": "test_iter", "time_diff": 0.30136}
+[12/17 15:11:35][INFO] logging.py:   99: json_stats: {"cur_iter": "223", "eta": "0:00:32", "split": "test_iter", "time_diff": 0.31099}
+[12/17 15:11:35][INFO] logging.py:   99: json_stats: {"cur_iter": "224", "eta": "0:00:30", "split": "test_iter", "time_diff": 0.30213}
+[12/17 15:12:05][INFO] logging.py:   99: json_stats: {"cur_iter": "225", "eta": "0:50:45", "split": "test_iter", "time_diff": 30.15133}
+[12/17 15:12:06][INFO] logging.py:   99: json_stats: {"cur_iter": "226", "eta": "0:00:30", "split": "test_iter", "time_diff": 0.30450}
+[12/17 15:12:11][INFO] logging.py:   99: json_stats: {"cur_iter": "227", "eta": "0:08:23", "split": "test_iter", "time_diff": 5.08149}
+[12/17 15:12:11][INFO] logging.py:   99: json_stats: {"cur_iter": "228", "eta": "0:00:28", "split": "test_iter", "time_diff": 0.29440}
+[12/17 15:12:11][INFO] logging.py:   99: json_stats: {"cur_iter": "229", "eta": "0:00:29", "split": "test_iter", "time_diff": 0.30392}
+[12/17 15:12:12][INFO] logging.py:   99: json_stats: {"cur_iter": "230", "eta": "0:00:29", "split": "test_iter", "time_diff": 0.30941}
+[12/17 15:12:12][INFO] logging.py:   99: json_stats: {"cur_iter": "231", "eta": "0:00:29", "split": "test_iter", "time_diff": 0.31323}
+[12/17 15:12:12][INFO] logging.py:   99: json_stats: {"cur_iter": "232", "eta": "0:00:28", "split": "test_iter", "time_diff": 0.30231}
+[12/17 15:12:39][INFO] logging.py:   99: json_stats: {"cur_iter": "233", "eta": "0:42:01", "split": "test_iter", "time_diff": 27.11081}
+[12/17 15:12:40][INFO] logging.py:   99: json_stats: {"cur_iter": "234", "eta": "0:00:28", "split": "test_iter", "time_diff": 0.30860}
+[12/17 15:12:42][INFO] logging.py:   99: json_stats: {"cur_iter": "235", "eta": "0:02:52", "split": "test_iter", "time_diff": 1.89807}
+[12/17 15:12:42][INFO] logging.py:   99: json_stats: {"cur_iter": "236", "eta": "0:00:27", "split": "test_iter", "time_diff": 0.30585}
+[12/17 15:12:42][INFO] logging.py:   99: json_stats: {"cur_iter": "237", "eta": "0:00:26", "split": "test_iter", "time_diff": 0.30154}
+[12/17 15:12:43][INFO] logging.py:   99: json_stats: {"cur_iter": "238", "eta": "0:00:28", "split": "test_iter", "time_diff": 0.32001}
+[12/17 15:12:50][INFO] logging.py:   99: json_stats: {"cur_iter": "239", "eta": "0:10:17", "split": "test_iter", "time_diff": 7.09235}
+[12/17 15:12:50][INFO] logging.py:   99: json_stats: {"cur_iter": "240", "eta": "0:00:26", "split": "test_iter", "time_diff": 0.30602}
+[12/17 15:13:16][INFO] logging.py:   99: json_stats: {"cur_iter": "241", "eta": "0:37:19", "split": "test_iter", "time_diff": 26.34669}
+[12/17 15:13:17][INFO] logging.py:   99: json_stats: {"cur_iter": "242", "eta": "0:00:25", "split": "test_iter", "time_diff": 0.30526}
+[12/17 15:13:17][INFO] logging.py:   99: json_stats: {"cur_iter": "243", "eta": "0:00:25", "split": "test_iter", "time_diff": 0.30539}
+[12/17 15:13:17][INFO] logging.py:   99: json_stats: {"cur_iter": "244", "eta": "0:00:25", "split": "test_iter", "time_diff": 0.30826}
+[12/17 15:13:18][INFO] logging.py:   99: json_stats: {"cur_iter": "245", "eta": "0:00:25", "split": "test_iter", "time_diff": 0.31223}
+[12/17 15:13:21][INFO] logging.py:   99: json_stats: {"cur_iter": "246", "eta": "0:04:26", "split": "test_iter", "time_diff": 3.32978}
+[12/17 15:13:31][INFO] logging.py:   99: json_stats: {"cur_iter": "247", "eta": "0:12:55", "split": "test_iter", "time_diff": 9.81266}
+[12/17 15:13:31][INFO] logging.py:   99: json_stats: {"cur_iter": "248", "eta": "0:00:23", "split": "test_iter", "time_diff": 0.30612}
+[12/17 15:13:57][INFO] logging.py:   99: json_stats: {"cur_iter": "249", "eta": "0:32:52", "split": "test_iter", "time_diff": 25.61988}
+[12/17 15:13:57][INFO] logging.py:   99: json_stats: {"cur_iter": "250", "eta": "0:00:22", "split": "test_iter", "time_diff": 0.30011}
+[12/17 15:13:57][INFO] logging.py:   99: json_stats: {"cur_iter": "251", "eta": "0:00:22", "split": "test_iter", "time_diff": 0.30616}
+[12/17 15:13:58][INFO] logging.py:   99: json_stats: {"cur_iter": "252", "eta": "0:00:23", "split": "test_iter", "time_diff": 0.31427}
+[12/17 15:13:58][INFO] logging.py:   99: json_stats: {"cur_iter": "253", "eta": "0:00:22", "split": "test_iter", "time_diff": 0.30845}
+[12/17 15:14:00][INFO] logging.py:   99: json_stats: {"cur_iter": "254", "eta": "0:02:29", "split": "test_iter", "time_diff": 2.08101}
+[12/17 15:14:05][INFO] logging.py:   99: json_stats: {"cur_iter": "255", "eta": "0:06:17", "split": "test_iter", "time_diff": 5.32027}
+[12/17 15:14:06][INFO] logging.py:   99: json_stats: {"cur_iter": "256", "eta": "0:00:21", "split": "test_iter", "time_diff": 0.30722}
+[12/17 15:14:37][INFO] logging.py:   99: json_stats: {"cur_iter": "257", "eta": "0:36:14", "split": "test_iter", "time_diff": 31.51513}
+[12/17 15:14:37][INFO] logging.py:   99: json_stats: {"cur_iter": "258", "eta": "0:00:20", "split": "test_iter", "time_diff": 0.30051}
+[12/17 15:14:38][INFO] logging.py:   99: json_stats: {"cur_iter": "259", "eta": "0:00:20", "split": "test_iter", "time_diff": 0.30876}
+[12/17 15:14:38][INFO] logging.py:   99: json_stats: {"cur_iter": "260", "eta": "0:00:20", "split": "test_iter", "time_diff": 0.31055}
+[12/17 15:14:38][INFO] logging.py:   99: json_stats: {"cur_iter": "261", "eta": "0:00:20", "split": "test_iter", "time_diff": 0.30886}
+[12/17 15:14:39][INFO] logging.py:   99: json_stats: {"cur_iter": "262", "eta": "0:00:19", "split": "test_iter", "time_diff": 0.30414}
+[12/17 15:14:43][INFO] logging.py:   99: json_stats: {"cur_iter": "263", "eta": "0:04:46", "split": "test_iter", "time_diff": 4.54575}
+[12/17 15:14:44][INFO] logging.py:   99: json_stats: {"cur_iter": "264", "eta": "0:00:18", "split": "test_iter", "time_diff": 0.29581}
+[12/17 15:15:16][INFO] logging.py:   99: json_stats: {"cur_iter": "265", "eta": "0:32:34", "split": "test_iter", "time_diff": 32.03479}
+[12/17 15:15:16][INFO] logging.py:   99: json_stats: {"cur_iter": "266", "eta": "0:00:18", "split": "test_iter", "time_diff": 0.30489}
+[12/17 15:15:16][INFO] logging.py:   99: json_stats: {"cur_iter": "267", "eta": "0:00:17", "split": "test_iter", "time_diff": 0.30452}
+[12/17 15:15:17][INFO] logging.py:   99: json_stats: {"cur_iter": "268", "eta": "0:00:18", "split": "test_iter", "time_diff": 0.31408}
+[12/17 15:15:17][INFO] logging.py:   99: json_stats: {"cur_iter": "269", "eta": "0:00:17", "split": "test_iter", "time_diff": 0.30724}
+[12/17 15:15:18][INFO] logging.py:   99: json_stats: {"cur_iter": "270", "eta": "0:00:58", "split": "test_iter", "time_diff": 1.04906}
+[12/17 15:15:18][INFO] logging.py:   99: json_stats: {"cur_iter": "271", "eta": "0:00:16", "split": "test_iter", "time_diff": 0.30155}
+[12/17 15:15:19][INFO] logging.py:   99: json_stats: {"cur_iter": "272", "eta": "0:00:16", "split": "test_iter", "time_diff": 0.30854}
+[12/17 15:15:57][INFO] logging.py:   99: json_stats: {"cur_iter": "273", "eta": "0:34:11", "split": "test_iter", "time_diff": 38.71434}
+[12/17 15:15:58][INFO] logging.py:   99: json_stats: {"cur_iter": "274", "eta": "0:00:17", "split": "test_iter", "time_diff": 0.33766}
+[12/17 15:15:58][INFO] logging.py:   99: json_stats: {"cur_iter": "275", "eta": "0:00:14", "split": "test_iter", "time_diff": 0.29112}
+[12/17 15:15:58][INFO] logging.py:   99: json_stats: {"cur_iter": "276", "eta": "0:00:15", "split": "test_iter", "time_diff": 0.30612}
+[12/17 15:15:58][INFO] logging.py:   99: json_stats: {"cur_iter": "277", "eta": "0:00:14", "split": "test_iter", "time_diff": 0.30602}
+[12/17 15:15:59][INFO] logging.py:   99: json_stats: {"cur_iter": "278", "eta": "0:00:14", "split": "test_iter", "time_diff": 0.30380}
+[12/17 15:15:59][INFO] logging.py:   99: json_stats: {"cur_iter": "279", "eta": "0:00:17", "split": "test_iter", "time_diff": 0.37588}
+[12/17 15:15:59][INFO] logging.py:   99: json_stats: {"cur_iter": "280", "eta": "0:00:13", "split": "test_iter", "time_diff": 0.29785}
+[12/17 15:16:35][INFO] logging.py:   99: json_stats: {"cur_iter": "281", "eta": "0:26:21", "split": "test_iter", "time_diff": 35.13716}
+[12/17 15:16:35][INFO] logging.py:   99: json_stats: {"cur_iter": "282", "eta": "0:00:12", "split": "test_iter", "time_diff": 0.29238}
+[12/17 15:16:35][INFO] logging.py:   99: json_stats: {"cur_iter": "283", "eta": "0:00:12", "split": "test_iter", "time_diff": 0.29953}
+[12/17 15:16:36][INFO] logging.py:   99: json_stats: {"cur_iter": "284", "eta": "0:00:13", "split": "test_iter", "time_diff": 0.31786}
+[12/17 15:16:36][INFO] logging.py:   99: json_stats: {"cur_iter": "285", "eta": "0:00:13", "split": "test_iter", "time_diff": 0.31732}
+[12/17 15:16:38][INFO] logging.py:   99: json_stats: {"cur_iter": "286", "eta": "0:01:42", "split": "test_iter", "time_diff": 2.55065}
+[12/17 15:16:39][INFO] logging.py:   99: json_stats: {"cur_iter": "287", "eta": "0:00:11", "split": "test_iter", "time_diff": 0.29954}
+[12/17 15:16:39][INFO] logging.py:   99: json_stats: {"cur_iter": "288", "eta": "0:00:11", "split": "test_iter", "time_diff": 0.31444}
+[12/17 15:17:08][INFO] logging.py:   99: json_stats: {"cur_iter": "289", "eta": "0:17:41", "split": "test_iter", "time_diff": 28.69350}
+[12/17 15:17:08][INFO] logging.py:   99: json_stats: {"cur_iter": "290", "eta": "0:00:10", "split": "test_iter", "time_diff": 0.29315}
+[12/17 15:17:08][INFO] logging.py:   99: json_stats: {"cur_iter": "291", "eta": "0:00:10", "split": "test_iter", "time_diff": 0.29836}
+[12/17 15:17:09][INFO] logging.py:   99: json_stats: {"cur_iter": "292", "eta": "0:00:10", "split": "test_iter", "time_diff": 0.31021}
+[12/17 15:17:09][INFO] logging.py:   99: json_stats: {"cur_iter": "293", "eta": "0:00:10", "split": "test_iter", "time_diff": 0.31188}
+[12/17 15:17:18][INFO] logging.py:   99: json_stats: {"cur_iter": "294", "eta": "0:04:39", "split": "test_iter", "time_diff": 8.73381}
+[12/17 15:17:18][INFO] logging.py:   99: json_stats: {"cur_iter": "295", "eta": "0:00:09", "split": "test_iter", "time_diff": 0.30707}
+[12/17 15:17:18][INFO] logging.py:   99: json_stats: {"cur_iter": "296", "eta": "0:00:09", "split": "test_iter", "time_diff": 0.31105}
+[12/17 15:17:42][INFO] logging.py:   99: json_stats: {"cur_iter": "297", "eta": "0:11:34", "split": "test_iter", "time_diff": 23.94271}
+[12/17 15:17:43][INFO] logging.py:   99: json_stats: {"cur_iter": "298", "eta": "0:00:08", "split": "test_iter", "time_diff": 0.29323}
+[12/17 15:17:43][INFO] logging.py:   99: json_stats: {"cur_iter": "299", "eta": "0:00:08", "split": "test_iter", "time_diff": 0.30809}
+[12/17 15:17:43][INFO] logging.py:   99: json_stats: {"cur_iter": "300", "eta": "0:00:08", "split": "test_iter", "time_diff": 0.30964}
+[12/17 15:17:43][INFO] logging.py:   99: json_stats: {"cur_iter": "301", "eta": "0:00:07", "split": "test_iter", "time_diff": 0.31377}
+[12/17 15:17:55][INFO] logging.py:   99: json_stats: {"cur_iter": "302", "eta": "0:04:34", "split": "test_iter", "time_diff": 11.44467}
+[12/17 15:17:55][INFO] logging.py:   99: json_stats: {"cur_iter": "303", "eta": "0:00:06", "split": "test_iter", "time_diff": 0.30128}
+[12/17 15:17:56][INFO] logging.py:   99: json_stats: {"cur_iter": "304", "eta": "0:00:06", "split": "test_iter", "time_diff": 0.31384}
+[12/17 15:18:26][INFO] logging.py:   99: json_stats: {"cur_iter": "305", "eta": "0:10:36", "split": "test_iter", "time_diff": 30.31204}
+[12/17 15:18:26][INFO] logging.py:   99: json_stats: {"cur_iter": "306", "eta": "0:00:05", "split": "test_iter", "time_diff": 0.29458}
+[12/17 15:18:26][INFO] logging.py:   99: json_stats: {"cur_iter": "307", "eta": "0:00:05", "split": "test_iter", "time_diff": 0.29933}
+[12/17 15:18:27][INFO] logging.py:   99: json_stats: {"cur_iter": "308", "eta": "0:00:05", "split": "test_iter", "time_diff": 0.31262}
+[12/17 15:18:27][INFO] logging.py:   99: json_stats: {"cur_iter": "309", "eta": "0:00:05", "split": "test_iter", "time_diff": 0.30925}
+[12/17 15:18:30][INFO] logging.py:   99: json_stats: {"cur_iter": "310", "eta": "0:00:48", "split": "test_iter", "time_diff": 3.00385}
+[12/17 15:18:30][INFO] logging.py:   99: json_stats: {"cur_iter": "311", "eta": "0:00:04", "split": "test_iter", "time_diff": 0.30662}
+[12/17 15:18:31][INFO] logging.py:   99: json_stats: {"cur_iter": "312", "eta": "0:00:04", "split": "test_iter", "time_diff": 0.30978}
+[12/17 15:19:00][INFO] logging.py:   99: json_stats: {"cur_iter": "313", "eta": "0:06:22", "split": "test_iter", "time_diff": 29.41990}
+[12/17 15:19:00][INFO] logging.py:   99: json_stats: {"cur_iter": "314", "eta": "0:00:03", "split": "test_iter", "time_diff": 0.29300}
+[12/17 15:19:01][INFO] logging.py:   99: json_stats: {"cur_iter": "315", "eta": "0:00:03", "split": "test_iter", "time_diff": 0.29167}
+[12/17 15:19:01][INFO] logging.py:   99: json_stats: {"cur_iter": "316", "eta": "0:00:02", "split": "test_iter", "time_diff": 0.29975}
+[12/17 15:19:01][INFO] logging.py:   99: json_stats: {"cur_iter": "317", "eta": "0:00:02", "split": "test_iter", "time_diff": 0.29599}
+[12/17 15:19:09][INFO] logging.py:   99: json_stats: {"cur_iter": "318", "eta": "0:01:02", "split": "test_iter", "time_diff": 7.81288}
+[12/17 15:19:13][INFO] logging.py:   99: json_stats: {"cur_iter": "319", "eta": "0:00:29", "split": "test_iter", "time_diff": 4.16349}
+[12/17 15:19:14][INFO] logging.py:   99: json_stats: {"cur_iter": "320", "eta": "0:00:01", "split": "test_iter", "time_diff": 0.28676}
+[12/17 15:19:42][INFO] logging.py:   99: json_stats: {"cur_iter": "321", "eta": "0:02:20", "split": "test_iter", "time_diff": 28.10261}
+[12/17 15:19:42][INFO] logging.py:   99: json_stats: {"cur_iter": "322", "eta": "0:00:01", "split": "test_iter", "time_diff": 0.28154}
+[12/17 15:19:42][INFO] logging.py:   99: json_stats: {"cur_iter": "323", "eta": "0:00:00", "split": "test_iter", "time_diff": 0.28461}
+[12/17 15:19:43][INFO] logging.py:   99: json_stats: {"cur_iter": "324", "eta": "0:00:00", "split": "test_iter", "time_diff": 0.28518}
+[12/17 15:19:43][INFO] logging.py:   99: json_stats: {"cur_iter": "325", "eta": "0:00:00", "split": "test_iter", "time_diff": 0.22502}
+clip count Ids=tensor([[42160, 43235, 46283]]) = tensor([2, 2, 2]) (should be 1)
+[12/17 15:19:44][WARNING] meters.py:  404: clip count Ids=tensor([[42160, 43235, 46283]]) = tensor([2, 2, 2]) (should be 1)
+clip count Ids=tensor([[42160, 43235, 46283]]) = tensor([2, 2, 2]) (should be 1)
+clip count Ids=tensor([[42160, 43235, 46283]]) = tensor([2, 2, 2]) (should be 1)
+[12/17 15:19:44][INFO] logging.py:   99: json_stats: {"split": "test_final", "top1_acc": "89.34", "top5_acc": "98.99"}
+[12/17 15:19:44][INFO] test_net.py:  388: Successfully saved features to /mnt/imslowfast/results/species_classification/disjoint_f=32_test/disjoint_f=32_test_e48_feats.pkl
+[12/17 15:19:44][INFO] test_net.py:  393: Finalized testing with 1 temporal clips and 1 spatial crops
+[12/17 15:19:44][INFO] test_net.py:  413: _p31.67_f219.00_1a89.34 Top5 Acc: 98.99 MEM: 22.36 f: 218.9993
+[12/17 15:19:44][INFO] test_net.py:  414: _p31.67_f219.00_1a89.34

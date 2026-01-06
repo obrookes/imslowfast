@@ -1,0 +1,24 @@
+Running on host nid001015
+Time is Wed  5 Mar 15:31:08 UTC 2025
+Slurm job ID is 46826
+/usr/bin/rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+config files: ['/mnt/imslowfast/configs/species_classification/MVIT_B_16x4_OVERLAPPING_MIXUP_F=32.yaml']
+Traceback (most recent call last):
+  File "/home/aiape/obrookes.aiape/imslowfast/./tools/run_net.py", line 52, in <module>
+    main()
+  File "/home/aiape/obrookes.aiape/imslowfast/./tools/run_net.py", line 22, in main
+    cfg = load_config(args, path_to_config)
+  File "/home/aiape/obrookes.aiape/imslowfast/slowfast/utils/parser.py", line 132, in load_config
+    cfg.merge_from_file(path_to_config)
+  File "/usr/local/lib/python3.10/dist-packages/fvcore/common/config.py", line 119, in merge_from_file
+    loaded_cfg = self.load_yaml_with_base(cfg_filename, allow_unsafe=allow_unsafe)
+  File "/usr/local/lib/python3.10/dist-packages/fvcore/common/config.py", line 59, in load_yaml_with_base
+    with cls._open_cfg(filename) as f:
+  File "/usr/local/lib/python3.10/dist-packages/fvcore/common/config.py", line 40, in _open_cfg
+    return g_pathmgr.open(filename, "r")
+  File "/usr/local/lib/python3.10/dist-packages/iopath/common/file_io.py", line 1012, in open
+    bret = handler._open(path, mode, buffering=buffering, **kwargs)  # type: ignore
+  File "/usr/local/lib/python3.10/dist-packages/iopath/common/file_io.py", line 604, in _open
+    return open(  # type: ignore
+FileNotFoundError: [Errno 2] No such file or directory: '/mnt/imslowfast/configs/species_classification/MVIT_B_16x4_OVERLAPPING_MIXUP_F=32.yaml'
