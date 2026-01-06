@@ -30,7 +30,7 @@ logger = logging.get_logger(__name__)
 
 
 @DATASET_REGISTRY.register()
-class Nkinetics(torch.utils.data.Dataset):
+class Pkinetics(torch.utils.data.Dataset):
     """
     Kinetics video loader. Construct the Kinetics video loader, then sample
     clips from the videos. For training and validation, a single clip is
@@ -113,7 +113,6 @@ class Nkinetics(torch.utils.data.Dataset):
         assert pathmgr.exists(path_to_file), "{} dir not found".format(path_to_file)
 
         self._path_to_fg_videos = []
-        self._path_to_bg_videos = []
         self._is_video_negative = []
         self._utms = []
         self._labels = []
@@ -131,7 +130,7 @@ class Nkinetics(torch.utils.data.Dataset):
             for clip_idx, path_label in enumerate(rows):
                 fetch_info = path_label.split(self.cfg.DATA.PATH_LABEL_SEPARATOR)
                 if len(fetch_info) > 3:
-                    fg_path, bg_path, label, is_negative, utm = (
+                    fg_path, _, label, is_negative, utm = (
                         self._separate_list_components(fetch_info)
                     )
                 else:
@@ -143,9 +142,6 @@ class Nkinetics(torch.utils.data.Dataset):
                 for idx in range(self._num_clips):
                     self._path_to_fg_videos.append(
                         os.path.join(self.cfg.DATA.PATH_PREFIX, fg_path)
-                    )
-                    self._path_to_bg_videos.append(
-                        os.path.join(self.cfg.DATA.PATH_PREFIX, bg_path)
                     )
                     self._is_video_negative.append(ast.literal_eval(is_negative))
                     self._utms.append(ast.literal_eval(utm))
@@ -160,9 +156,6 @@ class Nkinetics(torch.utils.data.Dataset):
         ), "Failed to load Kinetics split {} from {}".format(
             self._split_idx, path_to_file
         )
-        assert (len(self._path_to_bg_videos)) > 0, "Failed to load bg videos"
-        # Assert len of bg videos is same as fg videos
-        assert len(self._path_to_fg_videos) == len(self._path_to_bg_videos)
         logger.info(
             "Constructing kinetics dataloader (size: {} skip_rows {}) from {} ".format(
                 len(self._path_to_fg_videos), self.skip_rows, path_to_file
@@ -269,11 +262,13 @@ class Nkinetics(torch.utils.data.Dataset):
                 else [self.cfg.DATA.TRAIN_CROP_SIZE] * (num_decode - len(crop_size))
             )
             assert self.mode in ["train", "val"]
+
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
+        video_fg_container = None
+        video_fg2_container = None
+
         for i_try in range(self._num_retries):
-            video_fg_container = None
-            video_bg_container = None
             try:
                 video_fg_container = container.get_video_container(
                     self._path_to_fg_videos[index],
@@ -286,43 +281,6 @@ class Nkinetics(torch.utils.data.Dataset):
                         self._path_to_fg_videos[index], e
                     )
                 )
-            if self.cfg.FG_BG_MIXUP.RAND_SUB:
-                # get foreground video utm
-                fg_utm = self._utms[index]
-
-                # Find all indices for background videos with the fg_utm
-                matched_bg_indices = [
-                    i for i, x in enumerate(self._utms) if x == fg_utm
-                ]
-
-                # Select a random index from the list of indices
-                matched_bg_index = random.choice(matched_bg_indices)
-
-                try:
-                    video_bg_container = container.get_video_container(
-                        self._path_to_bg_videos[matched_bg_index],
-                        self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
-                        self.cfg.DATA.DECODING_BACKEND,
-                    )
-                except Exception as e:
-                    logger.info(
-                        "Failed to load background video from {} with error {}".format(
-                            self._path_to_bg_videos[matched_bg_index], e
-                        )
-                    )
-            else:
-                try:
-                    video_bg_container = container.get_video_container(
-                        self._path_to_bg_videos[index],
-                        self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
-                        self.cfg.DATA.DECODING_BACKEND,
-                    )
-                except Exception as e:
-                    logger.info(
-                        "Failed to load background video from {} with error {}".format(
-                            self._path_to_bg_videos[index], e
-                        )
-                    )
 
             # Get all unique utms
             unique_utms = list(set(self._utms))
@@ -333,25 +291,25 @@ class Nkinetics(torch.utils.data.Dataset):
                 random_utm = random.choice(unique_utms)
 
             # Find all indices for background videos with the selected utm
-            bg_indices = [i for i, x in enumerate(self._utms) if x == random_utm]
+            fg_indices = [i for i, x in enumerate(self._utms) if x == random_utm]
 
             # Select a random index from the list of background indices
-            random_bg_index = random.choice(bg_indices)
+            random_fg_index = random.choice(fg_indices)
 
             assert (
                 random_utm != self._utms[index]
             ), f"UTM {random_utm} is the same as {self._utms[index]}"
 
             try:
-                video_bg2_container = container.get_video_container(
-                    self._path_to_bg_videos[random_bg_index],
+                video_fg2_container = container.get_video_container(
+                    self._path_to_fg_videos[random_fg_index],
                     self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
                     self.cfg.DATA.DECODING_BACKEND,
                 )
             except Exception as e:
                 logger.info(
                     "Failed to load second background video from {} with error {}".format(
-                        self._path_to_bg_videos[random_bg_index], e
+                        self._path_to_fg_videos[random_fg_index], e
                     )
                 )
 
@@ -360,17 +318,12 @@ class Nkinetics(torch.utils.data.Dataset):
                     index = random.randint(0, len(self._path_to_fg_videos) - 1)
                 continue  # Select a random video if the current video was not able to access.
 
-            if (
-                (video_fg_container is None)
-                or (video_bg_container is None)
-                or (video_bg2_container is None)
-            ):
+            if (video_fg_container is None) or (video_fg2_container is None):
                 logger.warning(
                     "Failed to meta load video idx {} from {} or {} or {}; trial {}".format(
                         index,
                         self._path_to_fg_videos[index],
-                        self._path_to_bg_videos[index],
-                        self._path_to_bg_videos[random_bg_index],
+                        self._path_to_fg_videos[random_fg_index],
                         i_try,
                     )
                 )
@@ -432,29 +385,8 @@ class Nkinetics(torch.utils.data.Dataset):
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
             )
 
-            bg_frames, _, _ = decoder.decode(
-                video_bg_container,
-                sampling_rate,
-                num_frames,
-                temporal_sample_index,
-                self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
-                video_meta=(
-                    self._video_meta[index] if len(self._video_meta) < 5e6 else {}
-                ),  # do not cache on huge datasets
-                target_fps=target_fps,
-                backend=self.cfg.DATA.DECODING_BACKEND,
-                use_offset=self.cfg.DATA.USE_OFFSET_SAMPLING,
-                max_spatial_scale=(
-                    min_scale[0] if all(x == min_scale[0] for x in min_scale) else 0
-                ),  # if self.mode in ["test"] else 0,
-                time_diff_prob=self.p_convert_dt if self.mode in ["train"] else 0.0,
-                temporally_rnd_clips=True,
-                min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
-                max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
-            )
-
-            bg2_frames, _, _ = decoder.decode(
-                video_bg2_container,
+            fg2_frames, _, _ = decoder.decode(
+                video_fg2_container,
                 sampling_rate,
                 num_frames,
                 temporal_sample_index,
@@ -475,26 +407,22 @@ class Nkinetics(torch.utils.data.Dataset):
             )
 
             fg_frames_decoded = fg_frames
-            bg_frames_decoded = bg_frames
-            bg2_frames_decoded = bg2_frames
+            fg2_frames_decoded = fg2_frames
             time_idx_decoded = time_idx
 
             # If decoding failed (wrong format, video is too short, and etc),
             # select another video.
             if (
                 (fg_frames_decoded is None)
-                or (bg_frames_decoded is None)
-                or (bg2_frames_decoded is None)
+                or (fg2_frames_decoded is None)
                 or (None in fg_frames_decoded)
-                or (None in bg_frames_decoded)
-                or (None in bg2_frames_decoded)
+                or (None in fg2_frames_decoded)
             ):
                 logger.warning(
                     "Failed to decode video idx {} from {} or {} or {}; trial {}".format(
                         index,
                         self._path_to_fg_videos[index],
-                        self._path_to_bg_videos[index],
-                        self._path_to_bg_videos[random_bg_index],
+                        self._path_to_fg_videos[random_fg_index],
                         i_try,
                     )
                 )
@@ -512,34 +440,47 @@ class Nkinetics(torch.utils.data.Dataset):
                 else 1
             )
             num_out = num_aug * num_decode
-            fg_out, time_idx_out = [None] * num_out, [None] * num_out
-            bg_out, bg2_out = [None] * num_out, [None] * num_out
+            fg_out, fg2_out, time_idx_out = (
+                [None] * num_out,
+                [None] * num_out,
+                [None] * num_out,
+            )
 
             idx = -1
+
             # Handle label
-            label = self._labels[index]
+            y1 = ast.literal_eval(self._labels[index])
+            y2 = ast.literal_eval(self._labels[random_fg_index])
+
             # Handle negative indicator
             negative = self._is_video_negative[index]
+            negative2 = self._is_video_negative[random_fg_index]
+
             # Handle UTM
             utm = self._utms[index]
-            label = ast.literal_eval(label)
-            if isinstance(label, list):
-                label = torch.tensor(label, dtype=torch.float64)
+            utm2 = self._utms[random_fg_index]
+
+            if isinstance(y1, list):
+                y1 = torch.tensor(y1, dtype=torch.float64)
+
+            if isinstance(y2, list):
+                y2 = torch.tensor(y2, dtype=torch.float64)
+
+            labels = dict(y1=y1, y2=y2)
+
             for i in range(num_decode):
                 for _ in range(num_aug):
                     idx += 1
                     fg_out[idx] = fg_frames_decoded[i].clone()
-                    bg_out[idx] = bg_frames_decoded[i].clone()
-                    bg2_out[idx] = bg2_frames_decoded[i].clone()
+                    fg2_out[idx] = fg2_frames_decoded[i].clone()
 
                     time_idx_out[idx] = time_idx_decoded[i, :]
 
                     fg_out[idx] = fg_out[idx].float()
                     fg_out[idx] = fg_out[idx] / 255.0
-                    bg_out[idx] = bg_out[idx].float()
-                    bg_out[idx] = bg_out[idx] / 255.0
-                    bg2_out[idx] = bg2_out[idx].float()
-                    bg2_out[idx] = bg2_out[idx] / 255.0
+
+                    fg2_out[idx] = fg2_out[idx].float()
+                    fg2_out[idx] = fg2_out[idx] / 255.0
 
                     if self.mode in ["train"] and self.cfg.DATA.SSL_COLOR_JITTER:
                         fg_out[idx] = transform.color_jitter_video_ssl(
@@ -551,17 +492,8 @@ class Nkinetics(torch.utils.data.Dataset):
                             gaussan_sigma_min=self.cfg.DATA.SSL_BLUR_SIGMA_MIN,
                             gaussan_sigma_max=self.cfg.DATA.SSL_BLUR_SIGMA_MAX,
                         )
-                        bg_out[idx] = transform.color_jitter_video_ssl(
-                            bg_out[idx],
-                            bri_con_sat=self.cfg.DATA.SSL_COLOR_BRI_CON_SAT,
-                            hue=self.cfg.DATA.SSL_COLOR_HUE,
-                            p_convert_gray=self.p_convert_gray,
-                            moco_v2_aug=self.cfg.DATA.SSL_MOCOV2_AUG,
-                            gaussan_sigma_min=self.cfg.DATA.SSL_BLUR_SIGMA_MIN,
-                            gaussan_sigma_max=self.cfg.DATA.SSL_BLUR_SIGMA_MAX,
-                        )
-                        bg2_out[idx] = transform.color_jitter_video_ssl(
-                            bg2_out[idx],
+                        fg2_out[idx] = transform.color_jitter_video_ssl(
+                            fg2_out[idx],
                             bri_con_sat=self.cfg.DATA.SSL_COLOR_BRI_CON_SAT,
                             hue=self.cfg.DATA.SSL_COLOR_HUE,
                             p_convert_gray=self.p_convert_gray,
@@ -576,45 +508,35 @@ class Nkinetics(torch.utils.data.Dataset):
                             auto_augment=self.cfg.AUG.AA_TYPE,
                             interpolation=self.cfg.AUG.INTERPOLATION,
                         )
+
                         # T H W C -> T C H W.
                         fg_out[idx] = fg_out[idx].permute(0, 3, 1, 2)
-                        bg_out[idx] = bg_out[idx].permute(0, 3, 1, 2)
-                        bg2_out[idx] = bg2_out[idx].permute(0, 3, 1, 2)
+                        fg2_out[idx] = fg2_out[idx].permute(0, 3, 1, 2)
 
                         fg_list_img = self._frame_to_list_img(fg_out[idx])
                         fg_list_img = aug_transform(fg_list_img)
 
-                        bg_list_img = self._frame_to_list_img(bg_out[idx])
-                        bg_list_img = aug_transform(bg_list_img)
-
-                        bg2_list_img = self._frame_to_list_img(bg2_out[idx])
-                        bg2_list_img = aug_transform(bg2_list_img)
+                        fg2_list_img = self._frame_to_list_img(fg2_out[idx])
+                        fg2_list_img = aug_transform(fg2_list_img)
 
                         fg_out[idx] = self._list_img_to_frames(fg_list_img)
-                        bg_out[idx] = self._list_img_to_frames(bg_list_img)
-                        bg2_out[idx] = self._list_img_to_frames(bg2_list_img)
+                        fg2_out[idx] = self._list_img_to_frames(fg2_list_img)
 
                         fg_out[idx] = fg_out[idx].permute(0, 2, 3, 1)
-                        bg_out[idx] = bg_out[idx].permute(0, 2, 3, 1)
-                        bg2_out[idx] = bg2_out[idx].permute(0, 2, 3, 1)
+                        fg2_out[idx] = fg2_out[idx].permute(0, 2, 3, 1)
 
                     # Perform color normalization.
                     fg_out[idx] = utils.tensor_normalize(
                         fg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
                     )
 
-                    bg_out[idx] = utils.tensor_normalize(
-                        bg_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    )
-
-                    bg2_out[idx] = utils.tensor_normalize(
-                        bg2_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
+                    fg2_out[idx] = utils.tensor_normalize(
+                        fg2_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
                     )
 
                     # T H W C -> C T H W.
                     fg_out[idx] = fg_out[idx].permute(3, 0, 1, 2)
-                    bg_out[idx] = bg_out[idx].permute(3, 0, 1, 2)
-                    bg2_out[idx] = bg2_out[idx].permute(3, 0, 1, 2)
+                    fg2_out[idx] = fg2_out[idx].permute(3, 0, 1, 2)
 
                     scl, asp = (
                         self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE,
@@ -643,25 +565,8 @@ class Nkinetics(torch.utils.data.Dataset):
                         ),
                     )
 
-                    bg_out[idx] = utils.spatial_sampling(
-                        bg_out[idx],
-                        spatial_idx=spatial_sample_index,
-                        min_scale=min_scale[i],
-                        max_scale=max_scale[i],
-                        crop_size=crop_size[i],
-                        random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
-                        inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-                        aspect_ratio=relative_aspect,
-                        scale=relative_scales,
-                        motion_shift=(
-                            self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-                            if self.mode in ["train"]
-                            else False
-                        ),
-                    )
-
-                    bg2_out[idx] = utils.spatial_sampling(
-                        bg2_out[idx],
+                    fg2_out[idx] = utils.spatial_sampling(
+                        fg2_out[idx],
                         spatial_idx=spatial_sample_index,
                         min_scale=min_scale[i],
                         max_scale=max_scale[i],
@@ -692,16 +597,16 @@ class Nkinetics(torch.utils.data.Dataset):
                         # Not neccessary to apply random erasing on backgrounds...
 
                     fg_out[idx] = utils.pack_pathway_output(self.cfg, fg_out[idx])
-                    bg_out[idx] = utils.pack_pathway_output(self.cfg, bg_out[idx])
-                    bg2_out[idx] = utils.pack_pathway_output(self.cfg, bg2_out[idx])
+                    fg2_out[idx] = utils.pack_pathway_output(self.cfg, fg2_out[idx])
 
                     if self.cfg.AUG.GEN_MASK_LOADER:
                         mask = self._gen_mask()
                         fg_out[idx] = fg_out[idx] + [torch.Tensor(), mask]
                         # Not neccessary to apply mask on backgrounds...
+
             fg_frames = fg_out[0] if num_out == 1 else fg_out
-            bg_frames = bg_out[0] if num_out == 1 else bg_out
-            bg2_frames = bg2_out[0] if num_out == 1 else bg2_out
+            fg2_frames = fg2_out[0] if num_out == 1 else fg2_out
+
             time_idx = np.array(time_idx_out)
             if (
                 num_aug * num_decode > 1
@@ -713,49 +618,35 @@ class Nkinetics(torch.utils.data.Dataset):
                 if self.dummy_output is None:
                     self.dummy_output = (
                         fg_frames,
-                        bg_frames,
-                        bg2_frames,
-                        label,
+                        fg2_frames,
+                        labels,
                         negative,
+                        negative2,
                         utm,
+                        utm2,
                         index,
                         time_idx,
                         {},
                         {},
                     )
 
-            if self.cfg.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.ENABLE:
-                # Select random int between 0 and cfg.NUM_FRAMES - 2
-                s = np.random.randint(0, self.cfg.DATA.NUM_FRAMES - 2)
-                s1 = np.random.randint(0, self.cfg.DATA.NUM_FRAMES - 2)
-
-                # Reduce temporal dimension of bg to 1
-                bg_frames[0] = bg_frames[0][:, s : s + 1, :, :]
-                bg2_frames[0] = bg2_frames[0][:, s1 : s1 + 1, :, :]
-
-                # Duplicate frame num_frames times along temporal dimension
-                if self.cfg.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.DUPLICATE_FRAME:
-                    bg_frames[0] = torch.cat(
-                        [bg_frames[0]] * self.cfg.DATA.NUM_FRAMES, 1
-                    )
-                    bg2_frames[0] = torch.cat(
-                        [bg2_frames[0]] * self.cfg.DATA.NUM_FRAMES, 1
-                    )
-
             inputs = {
-                "fg_frames": fg_frames,
-                "bg_frames": bg_frames,
-                "bg2_frames": bg2_frames,
-                "mask": negative,
+                "f1": fg_frames,
+                "f2": fg2_frames,
+                "m1": negative,
+                "m2": negative2,
                 "utm": utm,
+                "utm2": utm2,
             }
             meta = {
-                "fg_video_name": self._path_to_fg_videos[index].split("/")[-1],
-                "bg_video_name": self._path_to_bg_videos[index].split("/")[-1],
+                "f1_video_name": self._path_to_fg_videos[index].split("/")[-1],
+                "f2_video_name": self._path_to_fg_videos[random_fg_index].split("/")[
+                    -1
+                ],
             }
             return (
                 inputs,
-                label,
+                labels,
                 index,
                 time_idx,
                 meta,
@@ -855,6 +746,4 @@ class Nkinetics(torch.utils.data.Dataset):
         Returns:
             (int): the number of videos in the dataset.
         """
-        # Assert that the number of fg videos is the same as the number of bg videos
-        assert len(self._path_to_fg_videos) == len(self._path_to_bg_videos)
         return len(self._path_to_fg_videos)

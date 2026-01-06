@@ -955,6 +955,7 @@ class ManifoldMixupResNet(nn.Module):
             self.class_proportions = self.calculate_class_proportions(class_frequencies)
         else:
             self.class_proportions = None
+        self.conv3d = cfg.TEST.RETURN_CONV3D
         self._construct_network(cfg)
 
         init_helper.init_weights(
@@ -1095,7 +1096,8 @@ class ManifoldMixupResNet(nn.Module):
             norm_module=self.norm_module,
         )
 
-        self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        # self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
         self.head = head_helper.ResNetBasicHead(
             dim_in=[width_per_group * 32],
@@ -1203,6 +1205,7 @@ class ManifoldMixupResNet(nn.Module):
         x = self.s3(y)
         x = self.s4(x)
         x = self.s5(x)
+        conv3d = x
         x = torch.cat(x, 1)
         # average pool
         x = self.avg_pool(x)
@@ -1227,12 +1230,318 @@ class ManifoldMixupResNet(nn.Module):
                 return x, y_a, y_b, lam
         else:
             if self.return_feats:
-                feats = x
+                if self.conv3d:
+                    feats = conv3d
+                else:
+                    feats = x
                 x = self.projection(x)
                 return (x, feats)
             else:
                 x = self.projection(x)
                 return x
+
+
+@MODEL_REGISTRY.register()
+class ResNetFramewiseMixup(nn.Module):
+    """
+    ResNet model builder. It builds a ResNet like network backbone without
+    lateral connection (C2D, I3D, Slow).
+
+    Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
+    "SlowFast networks for video recognition."
+    https://arxiv.org/pdf/1812.03982.pdf
+
+    Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
+    "Non-local neural networks."
+    https://arxiv.org/pdf/1711.07971.pdf
+    """
+
+    def __init__(self, cfg):
+        """
+        The `__init__` method of any subclass should also contain these
+            arguments.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        super(ResNetFramewiseMixup, self).__init__()
+        self.norm_module = get_norm(cfg)
+        self.enable_detection = cfg.DETECTION.ENABLE
+        self.num_pathways = 1
+        self.independent_frame_mix = cfg.FRAMEWISE_MIXUP.INDEPENDENT_FRAME_MIX
+        self.randomise_frame_mix = cfg.FRAMEWISE_MIXUP.RANDOMISE_FRAME_MIX
+        self._construct_network(cfg)
+        init_helper.init_weights(
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
+        )
+
+    def _construct_network(self, cfg):
+        """
+        Builds a single pathway ResNet model.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        assert cfg.MODEL.ARCH in _POOL1.keys()
+        pool_size = _POOL1[cfg.MODEL.ARCH]
+        assert len({len(pool_size), self.num_pathways}) == 1
+        assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
+
+        (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
+
+        num_groups = cfg.RESNET.NUM_GROUPS
+        width_per_group = cfg.RESNET.WIDTH_PER_GROUP
+        dim_inner = num_groups * width_per_group
+
+        temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
+
+        s1 = stem_helper.VideoModelStem(
+            dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
+            dim_out=[width_per_group],
+            kernel=[temp_kernel[0][0] + [7, 7]],
+            stride=[[1, 2, 2]],
+            padding=[[temp_kernel[0][0][0] // 2, 3, 3]],
+            norm_module=self.norm_module,
+        )
+
+        s2 = resnet_helper.ResStage(
+            dim_in=[width_per_group],
+            dim_out=[width_per_group * 4],
+            dim_inner=[dim_inner],
+            temp_kernel_sizes=temp_kernel[1],
+            stride=cfg.RESNET.SPATIAL_STRIDES[0],
+            num_blocks=[d2],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[0],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[0],
+            nonlocal_group=cfg.NONLOCAL.GROUP[0],
+            nonlocal_pool=cfg.NONLOCAL.POOL[0],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
+        )
+
+        # Based on profiling data of activation size, s1 and s2 have the activation sizes
+        # that are 4X larger than the second largest. Therefore, checkpointing them gives
+        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
+        # with recomputing FLOPs.
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+            self.s1 = checkpoint_wrapper(s1)
+            self.s2 = checkpoint_wrapper(s2)
+        else:
+            self.s1 = s1
+            self.s2 = s2
+
+        for pathway in range(self.num_pathways):
+            pool = nn.MaxPool3d(
+                kernel_size=pool_size[pathway],
+                stride=pool_size[pathway],
+                padding=[0, 0, 0],
+            )
+            self.add_module("pathway{}_pool".format(pathway), pool)
+
+        self.s3 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 4],
+            dim_out=[width_per_group * 8],
+            dim_inner=[dim_inner * 2],
+            temp_kernel_sizes=temp_kernel[2],
+            stride=cfg.RESNET.SPATIAL_STRIDES[1],
+            num_blocks=[d3],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[1],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[1],
+            nonlocal_group=cfg.NONLOCAL.GROUP[1],
+            nonlocal_pool=cfg.NONLOCAL.POOL[1],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
+        )
+
+        self.s4 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 8],
+            dim_out=[width_per_group * 16],
+            dim_inner=[dim_inner * 4],
+            temp_kernel_sizes=temp_kernel[3],
+            stride=cfg.RESNET.SPATIAL_STRIDES[2],
+            num_blocks=[d4],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[2],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[2],
+            nonlocal_group=cfg.NONLOCAL.GROUP[2],
+            nonlocal_pool=cfg.NONLOCAL.POOL[2],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
+        )
+
+        self.s5 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 16],
+            dim_out=[width_per_group * 32],
+            dim_inner=[dim_inner * 8],
+            temp_kernel_sizes=temp_kernel[4],
+            stride=cfg.RESNET.SPATIAL_STRIDES[3],
+            num_blocks=[d5],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[3],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[3],
+            nonlocal_group=cfg.NONLOCAL.GROUP[3],
+            nonlocal_pool=cfg.NONLOCAL.POOL[3],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
+        )
+
+        self.avg_pool_3d = nn.AdaptiveAvgPool3d((1, 1, 1))
+        self.avg_pool_2d = nn.AdaptiveAvgPool2d((1, 2048))
+
+        self.head = head_helper.ResNetBasicHead(
+            dim_in=[width_per_group * 32],
+            num_classes=cfg.MODEL.NUM_CLASSES,
+            pool_size=(
+                [None]
+                if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                else [
+                    [
+                        cfg.DATA.NUM_FRAMES // pool_size[0][0],
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                    ]
+                ]
+            ),  # None for AdaptiveAvgPool3d((1, 1, 1))
+            dropout_rate=cfg.MODEL.DROPOUT_RATE,
+            act_func=cfg.MODEL.HEAD_ACT,
+            detach_head=cfg.MODEL.DETACH_HEAD,
+            detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+            cfg=cfg,
+        )
+
+        self.projection = self.head.projection
+
+    def forward(self, x, bbox=None):
+        x = x[:]  # avoid pass by reference
+        x = self.s1(x)
+        x = self.s2(x)
+        y = []  # Don't modify x list in place due to activation checkpoint.
+        for pathway in range(self.num_pathways):
+            pool = getattr(self, "pathway{}_pool".format(pathway))
+            y.append(pool(x[pathway]))
+        x = self.s3(y)
+        x = self.s4(x)
+        x = self.s5(x)  # [B, C, T, H, W]
+
+        if self.training:
+            # Extract framewise features
+            x = self.extract_framewise_features(
+                x, x[0].shape[2]  # [B, C, T]
+            )  # TODO: Check this is correct dim
+
+            x, lam, index = self.framewise_mixup(
+                x,
+                alpha=1,  # TODO: Make this config option
+                use_cuda=True if torch.cuda.is_available() else False,
+                independent_frame_mix=self.independent_frame_mix,
+                randomize_frames=self.randomise_frame_mix,
+            )
+            if self.independent_frame_mix:
+                x = self.projection(x)
+                return x, lam, index
+            else:
+                x = self.avg_pool_2d(x).squeeze(dim=1)
+                x = self.projection(x)
+                return x, lam, index
+        else:
+            x = torch.cat(x, 1)
+            x = self.avg_pool_3d(x)
+            x = torch.flatten(x, 1)
+            x = self.projection(x)
+            return x
+
+    def extract_framewise_features(self, feature_map, t):
+        spatially_pooled = F.adaptive_avg_pool3d(feature_map[0], (t, 1, 1))
+        framewise_features = torch.flatten(spatially_pooled, start_dim=2)
+        return framewise_features.permute(0, 2, 1)
+
+    def framewise_mixup(
+        self,
+        x,
+        alpha=1.0,
+        use_cuda=False,
+        independent_frame_mix=False,
+        randomize_frames=False,
+    ):
+        """
+        Returns mixed inputs, pairs of targets, and lambda for tensors of shape (B, T, D)
+        B: batch size, T: time steps, D: feature dimension
+
+        Parameters:
+        - x: input tensor of shape (B, T, D)
+        - y: target tensor
+        - alpha: parameter for Beta distribution
+        - use_cuda: whether to use CUDA for computations
+        - independent_frame_mix: if True, use independent lambda for each frame
+        - randomize_frames: if True, randomize the temporal order of frames when mixing
+        """
+        batch_size, time_steps, _ = x.size()
+
+        if alpha > 0:
+            if independent_frame_mix:
+                lam = torch.distributions.beta.Beta(alpha, alpha).sample(
+                    (batch_size, time_steps, 1)
+                )
+            else:
+                lam = torch.distributions.beta.Beta(alpha, alpha).sample(
+                    (batch_size, 1, 1)
+                )
+        else:
+            lam = torch.ones(
+                (batch_size, time_steps if independent_frame_mix else 1, 1)
+            )
+
+        lam = lam.to(x.device)
+
+        if use_cuda:
+            index = torch.randperm(batch_size).cuda()
+        else:
+            index = torch.randperm(batch_size)
+
+        x_permuted = x[index]
+
+        if randomize_frames:
+            # Generate random permutation for each sample in the batch
+            frame_permutation = torch.stack(
+                [torch.randperm(time_steps) for _ in range(batch_size)]
+            )
+            frame_permutation = frame_permutation.to(x.device)
+
+            # Apply the permutation to each sample
+            x_permuted = torch.stack(
+                [x_permuted[i, frame_permutation[i]] for i in range(batch_size)]
+            )
+
+        # Perform frame-wise interpolation
+        mixed_x = lam * x + (1 - lam) * x_permuted
+
+        return mixed_x, lam, index
 
 
 @MODEL_REGISTRY.register()
@@ -1263,8 +1572,356 @@ class ResNetFGBGMixup(nn.Module):
         self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
-        self.subtract_global = cfg.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG
-        self.add_global = cfg.FG_BG_MIXUP.ADD_GLOBAL_BG
+        self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
+        self.fg_bg_mixup_enable = cfg.FG_BG_MIXUP.ENABLE
+        self.mix_on_eval = cfg.FG_BG_MIXUP.MIX_ON_EVAL
+        self.subract_bg = cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE
+        self.subract_bg_alpha_max = cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX
+        self.add_bg2 = cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+        self._construct_network(cfg)
+        init_helper.init_weights(
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
+        )
+
+    def _construct_network(self, cfg):
+        """
+        Builds a single pathway ResNet model.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        assert cfg.MODEL.ARCH in _POOL1.keys()
+        pool_size = _POOL1[cfg.MODEL.ARCH]
+        assert len({len(pool_size), self.num_pathways}) == 1
+        assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
+
+        (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
+
+        num_groups = cfg.RESNET.NUM_GROUPS
+        width_per_group = cfg.RESNET.WIDTH_PER_GROUP
+        dim_inner = num_groups * width_per_group
+
+        temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
+
+        s1 = stem_helper.VideoModelStem(
+            dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
+            dim_out=[width_per_group],
+            kernel=[temp_kernel[0][0] + [7, 7]],
+            stride=[[1, 2, 2]],
+            padding=[[temp_kernel[0][0][0] // 2, 3, 3]],
+            norm_module=self.norm_module,
+        )
+
+        s2 = resnet_helper.ResStage(
+            dim_in=[width_per_group],
+            dim_out=[width_per_group * 4],
+            dim_inner=[dim_inner],
+            temp_kernel_sizes=temp_kernel[1],
+            stride=cfg.RESNET.SPATIAL_STRIDES[0],
+            num_blocks=[d2],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[0],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[0],
+            nonlocal_group=cfg.NONLOCAL.GROUP[0],
+            nonlocal_pool=cfg.NONLOCAL.POOL[0],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
+        )
+
+        # Based on profiling data of activation size, s1 and s2 have the activation sizes
+        # that are 4X larger than the second largest. Therefore, checkpointing them gives
+        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
+        # with recomputing FLOPs.
+
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+            self.s1 = checkpoint_wrapper(s1)
+            self.s2 = checkpoint_wrapper(s2)
+        else:
+            self.s1 = s1
+            self.s2 = s2
+
+        for pathway in range(self.num_pathways):
+            pool = nn.MaxPool3d(
+                kernel_size=pool_size[pathway],
+                stride=pool_size[pathway],
+                padding=[0, 0, 0],
+            )
+            self.add_module("pathway{}_pool".format(pathway), pool)
+
+        self.s3 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 4],
+            dim_out=[width_per_group * 8],
+            dim_inner=[dim_inner * 2],
+            temp_kernel_sizes=temp_kernel[2],
+            stride=cfg.RESNET.SPATIAL_STRIDES[1],
+            num_blocks=[d3],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[1],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[1],
+            nonlocal_group=cfg.NONLOCAL.GROUP[1],
+            nonlocal_pool=cfg.NONLOCAL.POOL[1],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
+        )
+
+        self.s4 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 8],
+            dim_out=[width_per_group * 16],
+            dim_inner=[dim_inner * 4],
+            temp_kernel_sizes=temp_kernel[3],
+            stride=cfg.RESNET.SPATIAL_STRIDES[2],
+            num_blocks=[d4],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[2],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[2],
+            nonlocal_group=cfg.NONLOCAL.GROUP[2],
+            nonlocal_pool=cfg.NONLOCAL.POOL[2],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
+        )
+
+        self.s5 = resnet_helper.ResStage(
+            dim_in=[width_per_group * 16],
+            dim_out=[width_per_group * 32],
+            dim_inner=[dim_inner * 8],
+            temp_kernel_sizes=temp_kernel[4],
+            stride=cfg.RESNET.SPATIAL_STRIDES[3],
+            num_blocks=[d5],
+            num_groups=[num_groups],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[3],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[3],
+            nonlocal_group=cfg.NONLOCAL.GROUP[3],
+            nonlocal_pool=cfg.NONLOCAL.POOL[3],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            stride_1x1=cfg.RESNET.STRIDE_1X1,
+            inplace_relu=cfg.RESNET.INPLACE_RELU,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
+        )
+
+        # self.avg_pool = nn.AvgPool3d([8, 8, 8], stride=1)
+        self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
+
+        if self.enable_detection:
+            self.head = head_helper.ResNetRoIHead(
+                dim_in=[width_per_group * 32],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=[[cfg.DATA.NUM_FRAMES // pool_size[0][0], 1, 1]],
+                resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2],
+                scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR],
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+            )
+        else:
+            self.head = head_helper.ResNetBasicHead(
+                dim_in=[width_per_group * 32],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=(
+                    [None]
+                    if cfg.MULTIGRID.SHORT_CYCLE
+                    or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                    else [
+                        [
+                            cfg.DATA.NUM_FRAMES // pool_size[0][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                        ]
+                    ]
+                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                detach_head=cfg.MODEL.DETACH_HEAD,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
+            )
+
+        self.projection = self.head.projection
+
+    def forward(self, x, alpha=0.0, beta=None):
+        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
+        mask = x["mask"]
+        for k, v in x.items():
+            if (k != "mask") and (k != "utm"):
+                if (k == "bg_frames") or (k == "bg2_frames"):
+                    if self.gen_bg_no_grad:
+                        with torch.no_grad():
+                            x = v[:]
+                            x = self.s1(x)
+                            x = self.s2(x)
+                            y = (
+                                []
+                            )  # Don't modify x list in place due to activation checkpoint.
+                            for pathway in range(self.num_pathways):
+                                pool = getattr(self, "pathway{}_pool".format(pathway))
+                                y.append(pool(x[pathway]))
+                            x = self.s3(y)
+                            x = self.s4(x)
+                            x = self.s5(x)
+                            x = torch.cat(x, 1)
+                            x = self.avg_pool(x)
+                            x = torch.flatten(x, 1)
+                            emb_dict[k] = x
+                    else:
+                        x = v[:]
+                        x = self.s1(x)
+                        x = self.s2(x)
+                        y = []
+                        for pathway in range(self.num_pathways):
+                            pool = getattr(self, "pathway{}_pool".format(pathway))
+                            y.append(pool(x[pathway]))
+                        x = self.s3(y)
+                        x = self.s4(x)
+                        x = self.s5(x)
+                        x = torch.cat(x, 1)
+                        x = self.avg_pool(x)
+                        x = torch.flatten(x, 1)
+                        emb_dict[k] = x
+                else:
+                    x = v[:]  # avoid pass by reference
+                    x = self.s1(x)
+                    x = self.s2(x)
+                    y = []  # Don't modify x list in place due to activation checkpoint.
+                    for pathway in range(self.num_pathways):
+                        pool = getattr(self, "pathway{}_pool".format(pathway))
+                        y.append(pool(x[pathway]))
+                    x = self.s3(y)
+                    x = self.s4(x)
+                    x = self.s5(x)
+                    x = torch.cat(x, 1)
+                    x = self.avg_pool(x)
+                    x = torch.flatten(x, 1)
+                    emb_dict[k] = x
+
+        mask = mask.clone().detach().bool()
+
+        if self.training and self.fg_bg_mixup_enable:
+            # Mix embeddings based on the batch
+            embs = self.mix_fg_bg(
+                emb_dict["fg_frames"],
+                emb_dict["bg_frames"],
+                emb_dict["bg2_frames"],
+                mask,
+                alpha,
+                beta,
+            )
+        elif (not self.training) and (self.mix_on_eval):
+            # alpha = 0.0 if self.subract_bg_alpha_max == 0.0 else 1.0
+            # beta must be None so we don't add bg2 embeddings during evaluation
+            embs = self.mix_fg_bg(
+                emb_dict["fg_frames"],
+                emb_dict["bg_frames"],
+                emb_dict["bg2_frames"],
+                mask,
+                alpha,
+                beta,
+            )
+        else:
+            embs = emb_dict["fg_frames"]
+
+        # Project to N dim
+        x = self.projection(embs)
+        return x
+
+    def mix_fg_bg(self, fg_embs, bg_embs, bg2_embs, mask, alpha, beta=None):
+        """
+        Process video embeddings based on the given criteria and UTM locations using PyTorch.
+
+        Args:
+        foreground_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
+        background_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
+        background2_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
+        mask: torch.Tensor of shape (batch_size,), True for negative foregrounds
+        alpha: float, alpha value for mixup
+        beta: float, beta value for mixup
+
+        Returns:
+        processed_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
+        """
+
+        # Create copies to avoid modifying the original tensors
+        processed_embeddings = fg_embs.clone()
+
+        # Create a boolean mask for positive foregrounds
+        positive_mask = ~mask
+
+        positive_indices = torch.where(positive_mask)[0]
+        for i in positive_indices:
+            if self.subract_bg:
+                if alpha > 0.0:
+                    # Subtract background embeddings with alpha
+                    background_subtracted = fg_embs[i] - bg_embs[i] * (1 - alpha)
+
+                    if self.add_bg2:
+                        # Add background to subtracted embeddings with beta mixup
+                        if beta is not None:
+                            processed_embeddings[i] = (
+                                background_subtracted + bg2_embs[i] * beta
+                            )
+                        else:
+                            # Add background to subtracted embeddings with complete mixup
+                            processed_embeddings[i] = (
+                                background_subtracted + bg2_embs[i]
+                            )
+                    else:
+                        processed_embeddings[i] = background_subtracted
+
+                else:
+                    # Subtract background embeddings
+                    processed_embeddings[i] = fg_embs[i] - bg_embs[i]
+
+        return processed_embeddings
+
+
+@MODEL_REGISTRY.register()
+class ResNetFGFGMixup(nn.Module):
+    """
+    ResNet model builder. It builds a ResNet like network backbone without
+    lateral connection (C2D, I3D, Slow).
+
+    Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
+    "SlowFast networks for video recognition."
+    https://arxiv.org/pdf/1812.03982.pdf
+
+    Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
+    "Non-local neural networks."
+    https://arxiv.org/pdf/1711.07971.pdf
+    """
+
+    def __init__(self, cfg):
+        """
+        The `__init__` method of any subclass should also contain these
+            arguments.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        super(ResNetFGFGMixup, self).__init__()
+        self.norm_module = get_norm(cfg)
+        self.enable_detection = cfg.DETECTION.ENABLE
+        self.num_pathways = 1
+        self.gen_bg_no_grad = cfg.FG_BG_MIXUP.GEN_BG_NO_GRAD
         self._construct_network(cfg)
         init_helper.init_weights(
             self,
@@ -1444,12 +2101,15 @@ class ResNetFGBGMixup(nn.Module):
 
         self.projection = self.head.projection
 
-    def forward(self, x):
-        emb_dict = {}  # fg_frames, bg_frames, bg_frames2
-        mask = x["mask"]
+    def forward(self, x, l):
+        emb_dict = {}  # fg_frames, fg2_frames
+        keys = ["f1", "f2"]
+
+        assert isinstance(l, dict), f"Expected a dictionary, got {type(l)}"
+
         for k, v in x.items():
-            if (k != "mask") and (k != "utm"):
-                x = v[:]  # avoid pass by reference
+            if k in keys:
+                x = v[:]
                 x = self.s1(x)
                 x = self.s2(x)
                 y = []  # Don't modify x list in place due to activation checkpoint.
@@ -1462,62 +2122,45 @@ class ResNetFGBGMixup(nn.Module):
                 x = torch.cat(x, 1)
                 x = self.avg_pool(x)
                 x = torch.flatten(x, 1)
-
                 emb_dict[k] = x
-
-        mask = mask.clone().detach().bool()
 
         if self.training:
             # Mix embeddings based on the batch
-            embs = self.mix_fg_bg(
-                emb_dict["fg_frames"],
-                emb_dict["bg_frames"],
-                emb_dict["bg2_frames"],
-                mask,
+            m_embs, y1, y2, lambdas = self.mix_fg_fg(
+                emb_dict,
+                l,
             )
+            x = self.projection(m_embs)
+            return x, y1, y2, lambdas
         else:
-            embs = emb_dict["fg_frames"]
+            embs = emb_dict["f1"]
 
         # Project to N dim
         x = self.projection(embs)
         return x
 
-    def mix_fg_bg(
-        self,
-        fg_embs,
-        bg_embs,
-        bg2_embs,
-        mask,
-    ):
-        """
-        Process video embeddings based on the given criteria and UTM locations using PyTorch.
+    def mix_fg_fg(self, emb_dict, label_dict, alpha=1.0):
+        """Returns mixed inputs, pairs of targets, and lambda"""
 
-        Args:
-        foreground_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-        background_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-        background2_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-        mask: torch.Tensor of shape (batch_size,), True for negative foregrounds
+        # Assert that the embeddings are of the same size
+        assert (
+            emb_dict["f1"].size() == emb_dict["f2"].size()
+        ), f"Embeddings are not of the same size: {emb_dict['f1'].size()} != {emb_dict['f2'].size()}"
+        assert (
+            label_dict["y1"].size() == label_dict["y2"].size()
+        ), f"Labels are not of the same size: {label_dict['y1'].size()} != {label_dict['y2'].size()}"
 
-        Returns:
-        processed_embeddings: torch.Tensor of shape (batch_size, embedding_dim)
-        """
+        # Get batch size
+        B = emb_dict["f1"].size(0)
 
-        # Create copies to avoid modifying the original tensors
-        processed_embeddings = fg_embs.clone()
+        # Generate mixing lambdas using Beta distribution
+        lambdas = torch.distributions.beta.Beta(alpha, alpha).sample(((B), 1))
+        lambdas = lambdas.to(emb_dict["f1"][0].device)
 
-        # Create a boolean mask for positive foregrounds
-        positive_mask = ~mask
+        # Mix embeddings
+        mixed_embs = lambdas * emb_dict["f1"] + (1 - lambdas) * emb_dict["f2"]
 
-        positive_indices = torch.where(positive_mask)[0]
-
-        for i in positive_indices:
-            # Subtract background from foreground for positive samples
-            background_subtracted = fg_embs[i] - bg_embs[i]
-
-            # Add background to subtracted embeddings
-            processed_embeddings[i] = background_subtracted + bg2_embs[i]
-
-        return processed_embeddings
+        return mixed_embs, label_dict["y1"], label_dict["y2"], lambdas
 
 
 @MODEL_REGISTRY.register()

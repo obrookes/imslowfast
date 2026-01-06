@@ -714,6 +714,11 @@ class TrainMeter:
                 torch.cat(self.all_preds).cpu().numpy(),
                 torch.cat(self.all_labels).cpu().numpy(),
             )
+
+            if self._cfg.FRAMEWISE_MIXUP.ENABLE:
+                if self._cfg.FRAMEWISE_MIXUP.INDEPENDENT_FRAME_MIX:
+                    preds = preds.mean(axis=1)
+
             macro_map = average_precision_score(labels, preds, average="macro")
             micro_map = average_precision_score(labels, preds, average="micro")
             aps = average_precision_score(labels, preds, average=None)
@@ -831,7 +836,10 @@ class ValMeter:
         """
         # TODO: merge update_prediction with update_stats.
         self.all_preds.append(preds)
-        self.all_labels.append(labels)
+        if self._cfg.FGFG_MIXUP.ENABLE:
+            self.all_labels.append(labels)
+        else:
+            self.all_labels.append(labels)
 
     def log_iter_stats(self, cur_epoch, cur_iter):
         """

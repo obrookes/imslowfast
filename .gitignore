@@ -11,19 +11,7 @@ catboost_info/
 weights/
 
 detectron2_repo/
-model=slow_r50_ds=panaf_seq_with_negatives/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=001/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=005/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=010/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=040/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=100/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=160/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=200/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=100-exp/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=100-exp-true_label/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=100-neg_only/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=101/
-model=slow_r50_ds=panaf_seq_with_negatives-epoch=103/
+results/
 
 vision/
 .vscode/

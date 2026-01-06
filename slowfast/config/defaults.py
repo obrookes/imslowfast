@@ -89,6 +89,19 @@ _C.CONTRASTIVE.SWAV_QEUE_LEN = 0
 # Wether to run online kNN evaluation during training
 _C.CONTRASTIVE.KNN_ON = True
 
+
+# ---------------------------------------------------------------------------- #
+# Framewise mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FRAMEWISE_MIXUP = CfgNode()
+
+_C.FRAMEWISE_MIXUP.ENABLE = False
+
+_C.FRAMEWISE_MIXUP.INDEPENDENT_FRAME_MIX = False
+
+_C.FRAMEWISE_MIXUP.RANDOMISE_FRAME_MIX = False
+
 # ---------------------------------------------------------------------------- #
 # Temporal action proposal options
 # ---------------------------------------------------------------------------- #
@@ -326,6 +339,8 @@ _C.TEST.SAVE_RESULTS_PATH = ""
 _C.TEST.NUM_TEMPORAL_CLIPS = []
 
 _C.TEST.RETURN_FEATS = False
+
+_C.TEST.RETURN_CONV3D = False
 
 _C.TEST.RETURN_CAS = False
 # -----------------------------------------------------------------------------
@@ -862,11 +877,23 @@ _C.FG_BG_MIXUP = CfgNode()
 
 _C.FG_BG_MIXUP.ENABLE = False
 
-_C.FG_BG_MIXUP.GLOBAL_BG = False
+_C.FG_BG_MIXUP.RAND_SUB = False
 
-_C.FG_BG_MIXUP.SUBTRACT_GLOBAL_BG = False
+_C.FG_BG_MIXUP.MIX_ON_EVAL = False
 
-_C.FG_BG_MIXUP.ADD_GLOBAL_BG = False
+_C.FG_BG_MIXUP.SUBTRACT_BG = CfgNode()
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ENABLE = True
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN = 0.0
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX = 1.0
+
+_C.FG_BG_MIXUP.ADD_BG2 = CfgNode()
+
+_C.FG_BG_MIXUP.ADD_BG2.ENABLE = True
+
+_C.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH = 100
 
 _C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME = CfgNode()
 
@@ -874,6 +901,15 @@ _C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.ENABLE = True
 
 _C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.DUPLICATE_FRAME = False
 
+_C.FG_BG_MIXUP.GEN_BG_NO_GRAD = False
+
+# ---------------------------------------------------------------------------- #
+# FG-FG Mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FGFG_MIXUP = CfgNode()
+
+_C.FGFG_MIXUP.ENABLE = False
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options
