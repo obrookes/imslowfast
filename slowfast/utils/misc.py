@@ -4,11 +4,13 @@
 import json
 import logging
 import math
-import numpy as np
 import os
 from datetime import datetime
+
+import numpy as np
 import psutil
 import torch
+import torch.distributed as dist
 import torchvision.io as io
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
@@ -98,6 +100,13 @@ def _get_model_analysis_input(cfg, use_train_input):
                 cfg.DATA.TRAIN_CROP_SIZE,
                 cfg.DATA.TRAIN_CROP_SIZE,
             )
+        elif cfg.TAP.ENABLE:
+            input_tensors = torch.rand(
+                rgb_dimension,
+                cfg.TAP.NUM_CLIPS * cfg.TAP.NUM_FRAMES,
+                cfg.DATA.TRAIN_CROP_SIZE,
+                cfg.DATA.TRAIN_CROP_SIZE,
+            )
         else:
             input_tensors = torch.rand(
                 rgb_dimension,
@@ -111,6 +120,13 @@ def _get_model_analysis_input(cfg, use_train_input):
                 rgb_dimension,
                 cfg.DATA.TEST_CROP_SIZE,
                 cfg.DATA.TEST_CROP_SIZE,
+            )
+        elif cfg.TAP.ENABLE:
+            input_tensors = torch.rand(
+                rgb_dimension,
+                cfg.TAP.NUM_CLIPS * cfg.TAP.NUM_FRAMES,
+                cfg.DATA.TRAIN_CROP_SIZE,
+                cfg.DATA.TRAIN_CROP_SIZE,
             )
         else:
             input_tensors = torch.rand(
@@ -131,6 +147,42 @@ def _get_model_analysis_input(cfg, use_train_input):
         if cfg.NUM_GPUS:
             bbox = bbox.cuda()
         inputs = (model_inputs, bbox)
+    elif cfg.AUG.MANIFOLD_MIXUP:
+        labels = torch.rand(1, cfg.MODEL.NUM_CLASSES)
+        inputs = (model_inputs, labels)
+    elif cfg.TRAIN.DATASET == "nkinetics":
+        if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE:
+            inputs = {
+                "fg_frames": model_inputs,
+                "bg_frames": model_inputs,
+                "bg2_frames": model_inputs,
+                "mask": torch.ones(1),
+                "utm": torch.ones(1),
+            }
+        else:
+            inputs = {
+                "fg_frames": model_inputs,
+                "bg_frames": model_inputs,
+                "mask": torch.ones(1),
+                "utm": torch.ones(1),
+            }
+    elif cfg.TRAIN.DATASET == "bkinetics":
+        inputs = {
+            "concat_frames": model_inputs,
+            "bg_frames": model_inputs,
+            "mask": torch.ones(1),
+            "utm": torch.ones(1),
+        }
+    elif cfg.FGFG_MIXUP.ENABLE:
+        inputs = {
+            "f1": model_inputs,
+            "f2": model_inputs,
+        }
+        labels = {
+            "y1": torch.rand(1, cfg.MODEL.NUM_CLASSES),
+            "y2": torch.rand(1, cfg.MODEL.NUM_CLASSES),
+        }
+        inputs = (inputs, labels)
     else:
         inputs = (model_inputs,)
     return inputs
@@ -213,9 +265,7 @@ def is_eval_epoch(cfg, cur_epoch, multigrid_schedule):
         prev_epoch = 0
         for s in multigrid_schedule:
             if cur_epoch < s[-1]:
-                period = max(
-                    (s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1
-                )
+                period = max((s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1)
                 return (s[-1] - 1 - cur_epoch) % period == 0
             prev_epoch = s[-1]
 
@@ -272,7 +322,7 @@ def plot_input_normed(
     tensor = tensor.float()
     try:
         os.mkdir(folder_path)
-    except Exception as e:
+    except Exception:
         pass
     tensor = convert_normalized_images(tensor)
     if output_video:
@@ -339,18 +389,10 @@ def plot_input_normed(
                     if bboxes is not None and len(bboxes) > i:
                         for box in bboxes[i]:
                             x1, y1, x2, y2 = box
-                            ax[i].vlines(
-                                x1, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].vlines(
-                                x2, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y1, x1, x2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y2, x1, x2, colors="g", linestyles="solid"
-                            )
+                            ax[i].vlines(x1, y1, y2, colors="g", linestyles="solid")
+                            ax[i].vlines(x2, y1, y2, colors="g", linestyles="solid")
+                            ax[i].hlines(y1, x1, x2, colors="g", linestyles="solid")
+                            ax[i].hlines(y2, x1, x2, colors="g", linestyles="solid")
 
                     if texts is not None and len(texts) > i:
                         ax[i].text(0, 0, texts[i])
@@ -361,7 +403,6 @@ def plot_input_normed(
 
 
 def convert_normalized_images(tensor):
-
     tensor = tensor * 0.225
     tensor = tensor + 0.45
 
@@ -411,23 +452,50 @@ def launch_job(cfg, init_method, func, daemon=False):
         daemon (bool): The spawned processes’ daemon flag. If set to True,
             daemonic processes will be created
     """
-    if cfg.NUM_GPUS > 1:
-        torch.multiprocessing.spawn(
-            mpu.run,
-            nprocs=cfg.NUM_GPUS,
-            args=(
-                cfg.NUM_GPUS,
-                func,
-                init_method,
-                cfg.SHARD_ID,
-                cfg.NUM_SHARDS,
-                cfg.DIST_BACKEND,
-                cfg,
-            ),
-            daemon=daemon,
+    if cfg.NUM_SHARDS >= 1 and cfg.USE_SBATCH:  # --> sbatch srun multi-node training
+        is_slurm_job = "SLURM_JOB_ID" in os.environ
+        if is_slurm_job:  # SLURM JOB
+            rank = int(os.environ["SLURM_PROCID"])
+            world_size = int(os.environ["SLURM_NNODES"]) * int(
+                os.environ["SLURM_TASKS_PER_NODE"][0]
+            )
+        else:  # LOCAL BASH RUN
+            rank = int(os.environ["RANK"])
+            world_size = int(os.environ["WORLD_SIZE"])
+
+        # Init process group
+        dist.init_process_group(
+            backend="nccl",
+            init_method=init_method,  # 'env://'
+            world_size=world_size,
+            rank=rank,
         )
-    else:
+
+        # Set local rank
+        gpu_to_work_on = rank % torch.cuda.device_count()
+        torch.cuda.set_device(gpu_to_work_on)
+
+        # Start run
+        # cfg.SHARD_ID = rank
         func(cfg=cfg)
+    else:
+        if cfg.NUM_GPUS > 1:
+            torch.multiprocessing.spawn(
+                mpu.run,
+                nprocs=cfg.NUM_GPUS,
+                args=(
+                    cfg.NUM_GPUS,
+                    func,
+                    init_method,
+                    cfg.SHARD_ID,
+                    cfg.NUM_SHARDS,
+                    cfg.DIST_BACKEND,
+                    cfg,
+                ),
+                daemon=daemon,
+            )
+        else:
+            func(cfg=cfg)
 
 
 def get_class_names(path, parent_path=None, subset_path=None):
@@ -468,17 +536,11 @@ def get_class_names(path, parent_path=None, subset_path=None):
             with pathmgr.open(parent_path, "r") as f:
                 d_parent = json.load(f)
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    parent_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(parent_path, err))
             return
         class_parent = {}
         for parent, children in d_parent.items():
-            indices = [
-                class2idx[c] for c in children if class2idx.get(c) is not None
-            ]
+            indices = [class2idx[c] for c in children if class2idx.get(c) is not None]
             class_parent[parent] = indices
 
     subset_ids = None
@@ -492,11 +554,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
                     if class2idx.get(name) is not None
                 ]
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    subset_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(subset_path, err))
             return
 
     return class_names, class_parent, subset_ids

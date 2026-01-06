@@ -4,8 +4,10 @@
 """Train a video classification model."""
 
 import math
-import numpy as np
+import pickle as pkl
 import pprint
+
+import numpy as np
 import torch
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 
@@ -24,10 +26,58 @@ from slowfast.models.contrastive import (
     contrastive_forward,
     contrastive_parameter_surgery,
 )
+from slowfast.models.head_helper import ResNetBasicHead
 from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 
 logger = logging.get_logger(__name__)
+
+
+def inverse_mapping(x, low=1, high=5):
+    # Ensure x is within the valid range
+    x = torch.clamp(x, low, high)
+
+    # Calculate the inverse mapping
+    return low + high - x
+
+
+def calculate_loss_with_pseudo_labels(preds, labels, loss_func, store_dict):
+    """
+    Calculate the loss between the predictions and the original labels using pseudo labels.
+
+    Args:
+    preds (torch.Tensor): Tensor of model predictions.
+    labels (torch.Tensor): Tensor of original labels.
+    store_dict (dict): Dictionary containing pseudo labels for each original label.
+
+    Returns:
+    torch.Tensor: Loss value.
+    """
+    total_loss = 0
+    for i in range(len(labels)):
+        original_label = labels[i].cpu().numpy()
+        num_labels_present = torch.tensor(int(sum(original_label)), dtype=int)
+        if num_labels_present > 0:
+            # Select k random pseudo labels
+            pseudo_labels = store_dict[str(original_label)]["pseudo_labels"]
+            # pseudo_probs = store_dict[str(original_label)]["probs"]
+            idxs = np.random.choice(
+                len(pseudo_labels),
+                int(inverse_mapping(num_labels_present)),
+                replace=False,
+            )
+            # TODO: weight losses by chained sequence probability
+            for idx in idxs:
+                loss = loss_func(
+                    preds[i],
+                    torch.tensor(
+                        pseudo_labels[idx], dtype=torch.float32, device=preds[i].device
+                    ),
+                )
+                total_loss += loss
+        else:
+            continue
+    return total_loss
 
 
 def train_epoch(
@@ -39,6 +89,8 @@ def train_epoch(
     cur_epoch,
     cfg,
     writer=None,
+    pseudo_labels=None,
+    alpha=0.0,
 ):
     """
     Perform the video training for one epoch.
@@ -53,12 +105,14 @@ def train_epoch(
             slowfast/config/defaults.py
         writer (TensorboardWriter, optional): TensorboardWriter object
             to writer Tensorboard log.
+        alpha (float): alpha value for FG-BG mixup.
     """
     # Enable train mode.
     model.train()
     train_meter.iter_tic()
     data_size = len(train_loader)
 
+    # with torch.autograd.set_detect_anomaly(True):
     if cfg.MIXUP.ENABLE:
         mixup_fn = MixUp(
             mixup_alpha=cfg.MIXUP.ALPHA,
@@ -71,12 +125,10 @@ def train_epoch(
 
     if cfg.MODEL.FROZEN_BN:
         misc.frozen_bn_stats(model)
+
     # Explicitly declare reduction to mean.
     loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
-
-    for cur_iter, (inputs, labels, index, time, meta) in enumerate(
-        train_loader
-    ):
+    for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             if isinstance(inputs, (list,)):
@@ -86,24 +138,65 @@ def train_epoch(
                             inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
                     else:
                         inputs[i] = inputs[i].cuda(non_blocking=True)
+            elif isinstance(inputs, (dict,)):
+                for key, val in inputs.items():
+                    if isinstance(val, (list,)):
+                        for i in range(len(val)):
+                            if isinstance(val[i], (list,)):
+                                for j in range(len(val[i])):
+                                    val[i][j] = val[i][j].cuda(non_blocking=True)
+                            else:
+                                try:
+                                    val[i] = val[i].cuda(non_blocking=True)
+                                except:
+                                    continue
+                    else:
+                        inputs[key] = val.cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
-            if not isinstance(labels, list):
+            if isinstance(labels, dict):
+                for key, val in labels.items():
+                    labels[key] = val.cuda(non_blocking=True)
+            elif not isinstance(labels, list):
                 labels = labels.cuda(non_blocking=True)
                 index = index.cuda(non_blocking=True)
                 time = time.cuda(non_blocking=True)
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if not isinstance(val[i], str):
+                            val[i] = val[i].cuda(non_blocking=True)
+                        else:
+                            continue
                 else:
                     meta[key] = val.cuda(non_blocking=True)
 
-        batch_size = (
-            inputs[0][0].size(0)
-            if isinstance(inputs[0], list)
-            else inputs[0].size(0)
-        )
+        try:
+            batch_size = (
+                inputs[0][0].size(0)
+                if isinstance(inputs[0], list)
+                else inputs[0].size(0)
+            )
+        except:
+            try:
+                try:
+                    batch_size = (
+                        inputs["fg_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+                except:
+                    batch_size = (
+                        inputs["concat_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+            except:
+                batch_size = (
+                    inputs["f1"][0].size(0)
+                    if isinstance(inputs, dict)
+                    else inputs["f1"].size(0)
+                )
         # Update the learning rate.
         epoch_exact = cur_epoch + float(cur_iter) / data_size
         lr = optim.get_epoch_lr(epoch_exact, cfg)
@@ -115,11 +208,11 @@ def train_epoch(
             inputs[0] = samples
 
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
-
             # Explicitly declare reduction to mean.
             perform_backward = True
             optimizer.zero_grad()
 
+            # Forward pass model
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
                 (
                     model,
@@ -134,18 +227,123 @@ def train_epoch(
                 preds = model(inputs, meta["boxes"])
             elif cfg.MASK.ENABLE:
                 preds, labels = model(inputs)
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
+                    preds, y_a, y_b, lam = model(inputs, labels)
+                elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                    preds, y_a, y_b, y_c, lam1, lam2 = model(inputs, labels)
+                else:
+                    raise NotImplementedError(
+                        "Manifold Mixup requires pairs or triplets"
+                    )
+            elif cfg.FGFG_MIXUP.ENABLE:
+                preds, y_a, y_b, lam = model(inputs, labels)
+            elif cfg.FG_BG_MIXUP.ENABLE:
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.ENABLE:
+                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                        if (
+                            cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                            and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                        ):
+                            beta = 1 - alpha
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(
+                                    inputs, alpha, beta, labels=labels
+                                )
+                            else:
+                                preds = model(inputs, alpha, beta, labels=labels)
+                        else:
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha, labels=labels)
+                            else:
+                                preds = model(inputs, alpha, labels=labels)
+                    elif (
+                        cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                        and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+                    ):
+                        preds = model(inputs, alpha, labels=labels)
+                else:
+                    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE:
+                        if (
+                            cfg.FG_BG_MIXUP.ADD_BG2.ENABLE
+                            and cur_epoch >= cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                        ):
+                            beta = 1 - alpha
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha, beta)
+                            else:
+                                preds = model(inputs, alpha, beta)
+                        else:
+                            if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                                preds, loss_ortho = model(inputs, alpha)
+                            else:
+                                preds = model(inputs, alpha)
+                    elif (
+                        cfg.FG_BG_MIXUP.ADD_BG.ENABLE
+                        and cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is False
+                    ):
+                        preds = model(inputs, alpha)
+
+                    else:
+                        preds = model(inputs, alpha)
+
+            elif cfg.FRAMEWISE_MIXUP.ENABLE:
+                preds, lam, index = model(inputs)
             else:
                 preds = model(inputs)
+
+            # Get labels and compute the loss.
             if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
                 labels = torch.zeros(
                     preds.size(0), dtype=labels.dtype, device=labels.device
                 )
-
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
                 loss = partial_loss
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                if cfg.AUG.MANIFOLD_MIXUP_PAIRS:
+                    l = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                    loss = l.mean()
+                elif cfg.AUG.MANIFOLD_MIXUP_TRIPLETS:
+                    l = (
+                        lam1 * loss_fun(preds, y_a)
+                        + lam2 * loss_fun(preds, y_b)
+                        + (1 - lam1 - lam2) * loss_fun(preds, y_c)
+                    )
+                    loss = l.mean()
+            elif cfg.DATA.PSEUDO_LABELS:
+                loss = (
+                    calculate_loss_with_pseudo_labels(
+                        preds, labels, loss_fun, pseudo_labels
+                    )
+                    * cfg.DATA.PSEUDO_LABELS_WEIGHT
+                ) + loss_fun(preds, labels)
+            elif cfg.FGFG_MIXUP.ENABLE:
+                loss = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                loss = loss.mean()
+            elif cfg.FRAMEWISE_MIXUP.ENABLE:
+                y_a, y_b = labels, labels[index]
+                if lam.size(1) > 1:
+                    # For independent frame mixing
+                    lam = lam.squeeze(-1)  # Shape: (B, T)
+                    loss = 0
+                    for t in range(preds.size(1)):  # Iterate over time steps
+                        loss_t = lam[:, t] * loss_fun(preds[:, t], y_a) + (
+                            1 - lam[:, t]
+                        ) * loss_fun(preds[:, t], y_b)
+                        loss += loss_t.mean()
+                    loss /= preds.size(1)  # Average over time steps
+                else:
+                    # For single lambda per sample
+                    # lam = lam.squeeze()  # Shape: (B,)
+                    loss = lam * loss_fun(preds, y_a) + (1 - lam) * loss_fun(preds, y_b)
+                    loss = loss.mean()
             else:
                 # Compute the loss.
-                loss = loss_fun(preds, labels)
+                if cfg.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS:
+                    assert len(preds) == len(labels)
+                    loss = loss_fun(preds, labels) + loss_ortho
+                else:
+                    loss = loss_fun(preds, labels)
 
         loss_extra = None
         if isinstance(loss, (list, tuple)):
@@ -153,6 +351,7 @@ def train_epoch(
 
         # check Nan Loss.
         misc.check_nan_losses(loss)
+
         if perform_backward:
             scaler.scale(loss).backward()
         # Unscales the gradients of optimizer's assigned params in-place
@@ -207,6 +406,11 @@ def train_epoch(
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
                     loss, grad_norm = du.all_reduce([loss, grad_norm])
+                    if cfg.FGFG_MIXUP.ENABLE:
+                        preds, labels = du.all_gather([preds, labels["y1"]])
+                    else:
+                        preds, labels = du.all_gather([preds, labels])
+                # Copy the stats from GPU to CPU (sync point).
                 loss, grad_norm = (
                     loss.item(),
                     grad_norm.item(),
@@ -227,6 +431,7 @@ def train_epoch(
                     loss_extra = [one_loss.item() for one_loss in loss_extra]
             else:
                 # Compute the errors.
+                # Compute the errors.
                 num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
                 top1_err, top5_err = [
                     (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
@@ -245,7 +450,12 @@ def train_epoch(
                     top5_err.item(),
                 )
 
-            # Update and log stats.
+            if cfg.FGFG_MIXUP.ENABLE:
+                # Update and log stats.
+                train_meter.update_predictions(preds.detach(), labels.detach())
+            else:
+                # Update and log stats.
+                train_meter.update_predictions(preds.detach(), labels.detach())
             train_meter.update_stats(
                 top1_err,
                 top5_err,
@@ -260,19 +470,35 @@ def train_epoch(
             )
             # write to tensorboard format if available.
             if writer is not None:
-                writer.add_scalars(
-                    {
-                        "Train/loss": loss,
-                        "Train/lr": lr,
-                        "Train/Top1_err": top1_err,
-                        "Train/Top5_err": top5_err,
-                    },
-                    global_step=data_size * cur_epoch + cur_iter,
-                )
+                if cfg.DATA.MULTI_LABEL:
+                    writer.add_scalars(
+                        {
+                            "Train/loss": loss,
+                            "Train/lr": lr,
+                        },
+                        global_step=data_size * cur_epoch + cur_iter,
+                    )
+                else:
+                    writer.add_scalars(
+                        {
+                            "Train/loss": loss,
+                            "Train/lr": lr,
+                            "Train/Top1_err": top1_err,
+                            "Train/Top5_err": top5_err,
+                        },
+                        global_step=data_size * cur_epoch + cur_iter,
+                    )
         train_meter.iter_toc()  # do measure allreduce for this meter
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         torch.cuda.synchronize()
         train_meter.iter_tic()
+
+        # for the last iteration, we need to update the model parameters
+        # and log the stats.
+
+        # if cur_iter == data_size:
+        #    bg_model = copy.deepcopy(model)
+
     del inputs
 
     # in case of fragmented memory
@@ -280,12 +506,24 @@ def train_epoch(
 
     # Log epoch stats.
     train_meter.log_epoch_stats(cur_epoch)
+
+    # write to tensorboard format if available.
+    if writer is not None:
+        if cfg.DATA.MULTI_LABEL:
+            writer.add_scalars(
+                {
+                    "Train/micro_mAP": train_meter.micro_map,
+                    "Train/macro_mAP": train_meter.macro_map,
+                },
+                global_step=cur_epoch,
+            )
+            writer.add_scalars({"Train/APs": train_meter.aps}, global_step=cur_epoch)
     train_meter.reset()
 
 
 @torch.no_grad()
 def eval_epoch(
-    val_loader, model, val_meter, cur_epoch, cfg, train_loader, writer
+    val_loader, model, val_meter, cur_epoch, cfg, train_loader, writer, alpha=0.0
 ):
     """
     Evaluate the model on the val set.
@@ -310,22 +548,57 @@ def eval_epoch(
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
                     inputs[i] = inputs[i].cuda(non_blocking=True)
+            elif isinstance(inputs, (dict,)):
+                for key, val in inputs.items():
+                    if isinstance(val, (list,)):
+                        for i in range(len(val)):
+                            val[i] = val[i].cuda(non_blocking=True)
+                    else:
+                        inputs[key] = val.cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
-            labels = labels.cuda()
+            if isinstance(labels, dict):
+                for key, val in labels.items():
+                    labels[key] = val.cuda(non_blocking=True)
+            else:
+                labels = labels.cuda()
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if not isinstance(val[i], str):
+                            val[i] = val[i].cuda(non_blocking=True)
+                        else:
+                            continue
                 else:
                     meta[key] = val.cuda(non_blocking=True)
             index = index.cuda()
             time = time.cuda()
-        batch_size = (
-            inputs[0][0].size(0)
-            if isinstance(inputs[0], list)
-            else inputs[0].size(0)
-        )
+        try:
+            batch_size = (
+                inputs[0][0].size(0)
+                if isinstance(inputs[0], list)
+                else inputs[0].size(0)
+            )
+        except:
+            try:
+                try:
+                    batch_size = (
+                        inputs["fg_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+                except:
+                    batch_size = (
+                        inputs["concat_frames"][0].size(0)
+                        if isinstance(inputs, dict)
+                        else inputs["fg_frames"].size(0)
+                    )
+            except:
+                batch_size = (
+                    inputs["f1"][0].size(0)
+                    if isinstance(inputs, dict)
+                    else inputs["f1"].size(0)
+                )
         val_meter.data_toc()
 
         if cfg.DETECTION.ENABLE:
@@ -359,9 +632,7 @@ def eval_epoch(
                 )
                 yd, yi = model(inputs, index, time)
                 K = yi.shape[1]
-                C = (
-                    cfg.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM
-                )  # eg 400 for Kinetics400
+                C = cfg.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM  # eg 400 for Kinetics400
                 candidates = train_labels.view(1, -1).expand(batch_size, -1)
                 retrieval = torch.gather(candidates, 1, yi)
                 retrieval_one_hot = torch.zeros((batch_size * K, C)).cuda()
@@ -372,12 +643,29 @@ def eval_epoch(
                     yd_transform.view(batch_size, -1, 1),
                 )
                 preds = torch.sum(probs, 1)
+            elif cfg.AUG.MANIFOLD_MIXUP:
+                preds = model(inputs, labels)
+            elif cfg.FGFG_MIXUP.ENABLE:
+                preds = model(inputs, labels)
+            elif cfg.FG_BG_MIXUP.ENABLE:
+                if cfg.FG_BG_MIXUP.ADD_BG2.ENABLE and cur_epoch >= (
+                    cfg.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH
+                ):
+                    beta = 1 - alpha
+                    preds = model(inputs, alpha, beta)
+                else:
+                    preds = model(inputs, alpha)
+            elif cfg.FRAMEWISE_MIXUP.ENABLE:
+                preds = model(inputs)
             else:
                 preds = model(inputs)
 
             if cfg.DATA.MULTI_LABEL:
                 if cfg.NUM_GPUS > 1:
-                    preds, labels = du.all_gather([preds, labels])
+                    if cfg.FGFG_MIXUP.ENABLE:
+                        preds, labels = du.all_gather([preds, labels["y1"]])
+                    else:
+                        preds, labels = du.all_gather([preds, labels])
             else:
                 if cfg.DATA.IN22k_VAL_IN1K != "":
                     preds = preds[:, :1000]
@@ -420,21 +708,24 @@ def eval_epoch(
     val_meter.log_epoch_stats(cur_epoch)
     # write to tensorboard format if available.
     if writer is not None:
-        if cfg.DETECTION.ENABLE:
+        if cfg.DATA.MULTI_LABEL:
             writer.add_scalars(
-                {"Val/mAP": val_meter.full_map}, global_step=cur_epoch
+                {
+                    "Val/micro_mAP": val_meter.micro_map,
+                    "Val/macro_mAP": val_meter.macro_map,
+                },
+                global_step=cur_epoch,
             )
+            writer.add_scalars({"Val/APs": val_meter.aps}, global_step=cur_epoch)
+        if cfg.DETECTION.ENABLE:
+            writer.add_scalars({"Val/mAP": val_meter.full_map}, global_step=cur_epoch)
         else:
             all_preds = [pred.clone().detach() for pred in val_meter.all_preds]
-            all_labels = [
-                label.clone().detach() for label in val_meter.all_labels
-            ]
+            all_labels = [label.clone().detach() for label in val_meter.all_labels]
             if cfg.NUM_GPUS:
                 all_preds = [pred.cpu() for pred in all_preds]
                 all_labels = [label.cpu() for label in all_labels]
-            writer.plot_eval(
-                preds=all_preds, labels=all_labels, global_step=cur_epoch
-            )
+            writer.plot_eval(preds=all_preds, labels=all_labels, global_step=cur_epoch)
 
     val_meter.reset()
 
@@ -491,9 +782,7 @@ def build_trainer(cfg):
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
     val_loader = loader.construct_loader(cfg, "val")
-    precise_bn_loader = loader.construct_loader(
-        cfg, "train", is_precise_bn=True
-    )
+    precise_bn_loader = loader.construct_loader(cfg, "train", is_precise_bn=True)
     # Create meters.
     train_meter = TrainMeter(len(train_loader), cfg)
     val_meter = ValMeter(len(val_loader), cfg)
@@ -524,6 +813,26 @@ def train(cfg):
 
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
+
+    if cfg.FG_BG_MIXUP.SUBTRACT_BG.ENABLE is True:
+        if cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "exp":
+            alpha_scheduler = torch.logspace(-10, 0, cfg.SOLVER.MAX_EPOCH, base=torch.e)
+
+        elif cfg.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER == "linear":
+            alpha_scheduler = torch.linspace(
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN,
+                cfg.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX,
+                cfg.SOLVER.MAX_EPOCH,
+            )
+    elif cfg.FG_BG_MIXUP.ADD_BG.ENABLE is True:
+        if cfg.FG_BG_MIXUP.ADD_BG.SCHEDULER == "linear":
+            alpha_scheduler = torch.linspace(
+                cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MIN,
+                cfg.FG_BG_MIXUP.ADD_BG.ALPHA_MAX,
+                cfg.SOLVER.MAX_EPOCH,
+            )
+    else:
+        alpha_scheduler = None
 
     # Init multigrid.
     multigrid = None
@@ -620,19 +929,22 @@ def train(cfg):
         val_meter = ValMeter(len(val_loader), cfg)
 
     # set up writer for logging to Tensorboard format.
-    if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
-        cfg.NUM_GPUS * cfg.NUM_SHARDS
-    ):
+    if cfg.TENSORBOARD.ENABLE and du.is_master_proc(cfg.NUM_GPUS * cfg.NUM_SHARDS):
         writer = tb.TensorboardWriter(cfg)
     else:
         writer = None
+
+    # Reinitialise classifier head if required
+    if cfg.MODEL.REINIT_HEAD:
+        print(f"Reinitialising head of model {cfg.MODEL.ARCH}...")
+        assert isinstance(model.head, ResNetBasicHead), "Head must be a ResNetBasicHead"
+        model.head.reset_weights()
 
     # Perform the training loop.
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
     epoch_timer = EpochTimer()
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
-
         if cur_epoch > 0 and cfg.DATA.LOADER_CHUNK_SIZE > 0:
             num_chunks = math.ceil(
                 cfg.DATA.LOADER_CHUNK_OVERALL_SIZE / cfg.DATA.LOADER_CHUNK_SIZE
@@ -668,16 +980,82 @@ def train(cfg):
                 else:
                     last_checkpoint = cfg.TRAIN.CHECKPOINT_FILE_PATH
                 logger.info("Load from {}".format(last_checkpoint))
-                cu.load_checkpoint(
-                    last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer
-                )
+                cu.load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer)
 
         # Shuffle the dataset.
         loader.shuffle_dataset(train_loader, cur_epoch)
         if hasattr(train_loader.dataset, "_set_epoch_num"):
             train_loader.dataset._set_epoch_num(cur_epoch)
+
+        # Pseudo labels
+        if cfg.DATA.PSEUDO_LABELS:
+            with open(cfg.DATA.PSEUDO_LABELS, "rb") as f:
+                pseudo_labels = pkl.load(f)
+        else:
+            pseudo_labels = None
+
         # Train for one epoch.
         epoch_timer.epoch_tic()
+        if alpha_scheduler is not None:
+            alpha = alpha_scheduler[cur_epoch]
+        else:
+            alpha = 0.0
+
+        if (
+            cfg.MODEL.MODEL_NAME == "DualResNetFGBG"
+            or cfg.MODEL.MODEL_NAME == "DualMViTFGBG"
+        ):
+            # print("DualMViTFGBG")
+            if cfg.NUM_GPUS > 1:
+                print("Loading FG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.module.fg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+                print("Loading BG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.module.bg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+            else:
+                print("Loading FG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.fg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.FG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
+                print("Loading BG model")
+                cu.load_checkpoint(
+                    cfg.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH,
+                    model.bg_model,
+                    False,
+                    None,
+                    inflation=False,
+                    epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+                    convert_from_caffe2=cfg.TRAIN.BG_MODEL_CHECKPOINT_TYPE == "caffe2",
+                    image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
+                )
+
         train_epoch(
             train_loader,
             model,
@@ -687,6 +1065,8 @@ def train(cfg):
             cur_epoch,
             cfg,
             writer,
+            pseudo_labels,
+            alpha,
         )
         epoch_timer.epoch_toc()
         logger.info(
@@ -745,6 +1125,10 @@ def train(cfg):
             )
         # Evaluate the model on validation set.
         if is_eval_epoch:
+            alpha_scheduler_value = (
+                alpha_scheduler[cur_epoch] if alpha_scheduler is not None else 0.0
+            )
+
             eval_epoch(
                 val_loader,
                 model,
@@ -753,8 +1137,11 @@ def train(cfg):
                 cfg,
                 train_loader,
                 writer,
+                alpha_scheduler_value,
             )
-    if start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE: # final checkpoint load
+    if (
+        start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE
+    ):  # final checkpoint load
         eval_epoch(val_loader, model, val_meter, start_epoch, cfg, train_loader, writer)
     if writer is not None:
         writer.close()
@@ -763,9 +1150,11 @@ def train(cfg):
         "".format(
             params / 1e6,
             flops,
-            epoch_timer.median_epoch_time() / 60.0
-            if len(epoch_timer.epoch_times)
-            else 0.0,
+            (
+                epoch_timer.median_epoch_time() / 60.0
+                if len(epoch_timer.epoch_times)
+                else 0.0
+            ),
             misc.gpu_mem_usage(),
             100 - val_meter.min_top1_err,
             100 - val_meter.min_top5_err,

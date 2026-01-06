@@ -2,7 +2,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Configs."""
+
 import math
+
 from fvcore.common.config import CfgNode
 
 from . import custom_config
@@ -89,6 +91,34 @@ _C.CONTRASTIVE.KNN_ON = True
 
 
 # ---------------------------------------------------------------------------- #
+# Framewise mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FRAMEWISE_MIXUP = CfgNode()
+
+_C.FRAMEWISE_MIXUP.ENABLE = False
+
+_C.FRAMEWISE_MIXUP.INDEPENDENT_FRAME_MIX = False
+
+_C.FRAMEWISE_MIXUP.RANDOMISE_FRAME_MIX = False
+
+# ---------------------------------------------------------------------------- #
+# Temporal action proposal options
+# ---------------------------------------------------------------------------- #
+
+_C.TAP = CfgNode()
+
+_C.TAP.ENABLE = False
+
+_C.TAP.NUM_CLIPS = 4
+
+_C.TAP.NUM_FRAMES = 4
+
+_C.TAP.SLIDING_WINDOW = False
+
+_C.TAP.OVERLAP = None
+
+# ---------------------------------------------------------------------------- #
 # Batch norm options
 # ---------------------------------------------------------------------------- #
 _C.BN = CfgNode()
@@ -171,6 +201,19 @@ _C.TRAIN.MIXED_PRECISION = False
 # if True, inflate some params from imagenet model.
 _C.TRAIN.CHECKPOINT_IN_INIT = False
 
+
+# Path to the bg model checkpoint to load the initial weight.
+_C.TRAIN.BG_MODEL_CHECKPOINT_FILE_PATH = ""
+
+# Checkpoint types include `caffe2` or `pytorch`.
+_C.TRAIN.BG_MODEL_CHECKPOINT_TYPE = "pytorch"
+
+# Path to the fg model checkpoint to load the initial weight.
+_C.TRAIN.FG_MODEL_CHECKPOINT_FILE_PATH = ""
+
+# Checkpoint types include `caffe2` or `pytorch`.
+_C.TRAIN.FG_MODEL_CHECKPOINT_TYPE = "pytorch"
+
 # ---------------------------------------------------------------------------- #
 # Augmentation options.
 # ---------------------------------------------------------------------------- #
@@ -223,6 +266,28 @@ _C.AUG.MASK_RATIO = 0.0
 # The maximum number of a masked block. None means no maximum limit. (Used only in image MaskFeat.)
 _C.AUG.MAX_MASK_PATCHES_PER_BLOCK = None
 
+_C.AUG.MANIFOLD_MIXUP = False
+
+_C.AUG.MANIFOLD_MIXUP_ALPHA = 1.0
+
+_C.AUG.MANIFOLD_MIXUP_CLASS_FREQUENCIES = ""
+
+_C.AUG.MANIFOLD_MIXUP_PAIRS = False
+
+_C.AUG.MANIFOLD_MIXUP_TRIPLETS = False
+
+# ---------------------------------------------------------------------------- #
+# Data sampling options.
+# ---------------------------------------------------------------------------- #
+
+_C.SAMPLING = CfgNode()
+
+# Whether to perform balanced sampling
+_C.SAMPLING.BALANCED = False
+
+# How to perform balanced sampling
+_C.SAMPLING.BALANCE_TYPE = None
+
 # ---------------------------------------------------------------------------- #
 # Masked pretraining visualization options.
 # ---------------------------------------------------------------------------- #
@@ -273,11 +338,11 @@ _C.TEST.CHECKPOINT_FILE_PATH = ""
 
 # Number of clips to sample from a video uniformly for aggregating the
 # prediction results.
-_C.TEST.NUM_ENSEMBLE_VIEWS = 10
+_C.TEST.NUM_ENSEMBLE_VIEWS = 1
 
 # Number of crops to sample from a frame spatially for aggregating the
 # prediction results.
-_C.TEST.NUM_SPATIAL_CROPS = 3
+_C.TEST.NUM_SPATIAL_CROPS = 1
 
 # Checkpoint types include `caffe2` or `pytorch`.
 _C.TEST.CHECKPOINT_TYPE = "pytorch"
@@ -285,6 +350,12 @@ _C.TEST.CHECKPOINT_TYPE = "pytorch"
 _C.TEST.SAVE_RESULTS_PATH = ""
 
 _C.TEST.NUM_TEMPORAL_CLIPS = []
+
+_C.TEST.RETURN_FEATS = False
+
+_C.TEST.RETURN_CONV3D = False
+
+_C.TEST.RETURN_CAS = False
 # -----------------------------------------------------------------------------
 # ResNet options
 # -----------------------------------------------------------------------------
@@ -432,11 +503,22 @@ _C.MODEL.ACT_CHECKPOINT = False
 # final fc layer will be trained.
 _C.MODEL.DETACH_FINAL_FC = False
 
+# If True, detach the head from the network, by doing so, only the head will be trained.
+_C.MODEL.DETACH_HEAD = False
+
+# Reinitialize the head.
+_C.MODEL.REINIT_HEAD = False
+
 # If True, frozen batch norm stats during training.
 _C.MODEL.FROZEN_BN = False
 
 # If True, AllReduce gradients are compressed to fp16
 _C.MODEL.FP16_ALLREDUCE = False
+
+_C.MODEL.FEAT_AGGREGATOR = "avg_pool"
+
+# use for dual fg bg model only
+_C.MODEL.HEAD_MLP_DIM = 2048
 
 
 # -----------------------------------------------------------------------------
@@ -651,17 +733,23 @@ _C.SLOWFAST.FUSION_KERNEL_SZ = 5
 # -----------------------------------------------------------------------------
 _C.DATA = CfgNode()
 
+# Switch spatial sampling on/off
+_C.DATA.SPATIAL_SAMPLING = False
+
 # The path to the data directory.
 _C.DATA.PATH_TO_DATA_DIR = ""
 
 # The separator used between path and label.
 _C.DATA.PATH_LABEL_SEPARATOR = " "
 
+# The separator used between path and label.
+_C.DATA.PATH_LABEL_SEPARATOR_IDX = -1
+
 # Video path prefix if any.
 _C.DATA.PATH_PREFIX = ""
 
 # The number of frames of the input clip.
-_C.DATA.NUM_FRAMES = 8
+_C.DATA.NUM_FRAMES = 4
 
 # The video sampling rate of the input clip.
 _C.DATA.SAMPLING_RATE = 8
@@ -680,6 +768,11 @@ _C.DATA.TRAIN_PCA_EIGVEC = [
 # `{"im_path": im_path, "class": cont_id}`
 # then we can skip the construction of imdb and load it from the local file.
 _C.DATA.PATH_TO_PRELOAD_IMDB = ""
+
+# If true use mean and std for normalization.
+_C.DATA.USE_MEAN = True
+
+_C.DATA.MEAN = [0.45, 0.45, 0.45]
 
 # The mean value of the video raw pixels across the R G B channels.
 _C.DATA.MEAN = [0.45, 0.45, 0.45]
@@ -796,10 +889,87 @@ _C.DATA.IN22K_TRAINVAL = False
 _C.DATA.IN22k_VAL_IN1K = ""
 
 # Large resolution models may use different crop ratios
-_C.DATA.IN_VAL_CROP_RATIO = 0.875 # 224/256 = 0.875
+_C.DATA.IN_VAL_CROP_RATIO = 0.875  # 224/256 = 0.875
 
 # don't use real video for kinetics.py
 _C.DATA.DUMMY_LOAD = False
+
+_C.DATA.PSEUDO_LABELS = ""
+
+_C.DATA.PSEUDO_LABELS_WEIGHT = 1.0
+
+# ---------------------------------------------------------------------------- #
+# FG-BG Mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FG_BG_MIXUP = CfgNode()
+
+_C.FG_BG_MIXUP.ENABLE = False
+
+_C.FG_BG_MIXUP.RAND_SUB = False
+
+_C.FG_BG_MIXUP.MIX_ON_EVAL = False
+
+_C.FG_BG_MIXUP.ADD_BG = CfgNode()
+
+_C.FG_BG_MIXUP.ADD_BG.ENABLE = False
+
+_C.FG_BG_MIXUP.ADD_BG.ALPHA_MIN = 0.0
+
+_C.FG_BG_MIXUP.ADD_BG.ALPHA_MAX = 1.0
+
+_C.FG_BG_MIXUP.ADD_BG.SCHEDULER = "linear"
+
+_C.FG_BG_MIXUP.SUBTRACT_BG = CfgNode()
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ENABLE = False
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MIN = 0.0
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ALPHA_MAX = 1.0
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.SCHEDULER = "linear"
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE = CfgNode()
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.ENABLE = False
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.APPLY_CLASSWISE.CLASSES = []
+
+_C.FG_BG_MIXUP.SUBTRACT_BG.ORTHO_EMBS = False
+
+_C.FG_BG_MIXUP.ADD_BG2 = CfgNode()
+
+_C.FG_BG_MIXUP.ADD_BG2.ENABLE = False
+
+_C.FG_BG_MIXUP.ADD_BG2.START_FROM_EPOCH = 100
+
+_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME = CfgNode()
+
+_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.ENABLE = False
+
+_C.FG_BG_MIXUP.SELECT_RAND_BG_FRAME.DUPLICATE_FRAME = False
+
+_C.FG_BG_MIXUP.GEN_BG_NO_GRAD = False
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES = CfgNode()
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.ENABLE = False
+
+# 1.0 - concat all frames of bg video
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.RATIO = 1.0
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.SORT_BG_FRAMES = False
+
+_C.FG_BG_MIXUP.CONCAT_BG_FRAMES.SUBSAMPLE_CONCAT_FRAMES = False
+
+# ---------------------------------------------------------------------------- #
+# FG-FG Mixup options
+# ---------------------------------------------------------------------------- #
+
+_C.FGFG_MIXUP = CfgNode()
+
+_C.FGFG_MIXUP.ENABLE = False
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options
@@ -908,6 +1078,8 @@ _C.LOG_MODEL_INFO = True
 
 # Distributed backend.
 _C.DIST_BACKEND = "nccl"
+
+_C.USE_SBATCH = False
 
 # ---------------------------------------------------------------------------- #
 # Benchmark options
