@@ -5,6 +5,7 @@
 
 import os
 import pickle
+import csv
 
 import numpy as np
 import torch
@@ -20,6 +21,45 @@ from slowfast.utils.env import pathmgr
 from slowfast.utils.meters import AVAMeter, TestMeter
 
 logger = logging.get_logger(__name__)
+
+
+def _get_probs_csv_path(cfg, num_view):
+    save_name = cfg.TEST.SAVE_PROBS_CSV_PATH or "test_probs.csv"
+    save_path = os.path.join(cfg.OUTPUT_DIR, save_name)
+    if len(cfg.TEST.NUM_TEMPORAL_CLIPS) > 1:
+        root, ext = os.path.splitext(save_path)
+        save_path = "{}_v{}{}".format(root, num_view, ext if ext else ".csv")
+    return save_path
+
+
+def _save_kinetics_probs_csv(test_loader, test_meter, cfg, num_view):
+    if cfg.TEST.DATASET.lower() != "kinetics":
+        raise NotImplementedError(
+            "TEST.NO_LABELS is currently supported only for TEST.DATASET=kinetics."
+        )
+    if not hasattr(test_loader.dataset, "_path_to_videos"):
+        raise NotImplementedError(
+            "Dataset is missing _path_to_videos required for filename CSV export."
+        )
+
+    num_clips = cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS
+    filenames = test_loader.dataset._path_to_videos[::num_clips]
+    probs = torch.softmax(test_meter.video_preds, dim=1).cpu()
+    if len(filenames) != probs.shape[0]:
+        raise RuntimeError(
+            "Mismatch between filenames ({}) and predictions ({}).".format(
+                len(filenames), probs.shape[0]
+            )
+        )
+
+    save_path = _get_probs_csv_path(cfg, num_view)
+    if du.is_root_proc():
+        with pathmgr.open(save_path, "w") as f:
+            writer = csv.writer(f)
+            writer.writerow(["filename"] + [str(i) for i in range(probs.shape[1])])
+            for idx, filename in enumerate(filenames):
+                writer.writerow([filename] + probs[idx].tolist())
+    return save_path
 
 
 @torch.no_grad()
@@ -51,6 +91,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
     all_feats = []
     all_names = []
     all_cas = []
+    all_labels = None
 
     for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(test_loader):
         if cfg.NUM_GPUS:
@@ -212,7 +253,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
         if cfg.NUM_GPUS:
             all_preds = all_preds.cpu()
             all_labels = all_labels.cpu()
-        if writer is not None:
+        if writer is not None and not cfg.TEST.NO_LABELS:
             writer.plot_eval(preds=all_preds, labels=all_labels)
 
         if cfg.TEST.SAVE_RESULTS_PATH != "":
@@ -220,11 +261,16 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None, epoch=None):
 
             if du.is_root_proc():
                 with pathmgr.open(save_path, "wb") as f:
-                    pickle.dump([all_preds, all_labels], f)
+                    pickle.dump(
+                        [all_preds, None if cfg.TEST.NO_LABELS else all_labels], f
+                    )
 
             logger.info("Successfully saved prediction results to {}".format(save_path))
 
-    test_meter.finalize_metrics()
+    if cfg.DETECTION.ENABLE or not cfg.TEST.NO_LABELS:
+        test_meter.finalize_metrics()
+    elif not cfg.DETECTION.ENABLE:
+        all_labels = None
     if cfg.TEST.RETURN_FEATS:
         if cfg.TEST.RETURN_CAS:
             return (
@@ -269,6 +315,7 @@ def test(cfg):
         cfg.TEST.NUM_TEMPORAL_CLIPS = [cfg.TEST.NUM_ENSEMBLE_VIEWS]
 
     test_meters = []
+    probs_csv_paths = []
     for num_view in cfg.TEST.NUM_TEMPORAL_CLIPS:
         cfg.TEST.NUM_ENSEMBLE_VIEWS = num_view
 
@@ -357,6 +404,12 @@ def test(cfg):
                 )
         else:
             perform_test(test_loader, model, test_meter, cfg, writer)
+
+        if cfg.TEST.NO_LABELS and not cfg.DETECTION.ENABLE:
+            csv_path = _save_kinetics_probs_csv(test_loader, test_meter, cfg, num_view)
+            probs_csv_paths.append(csv_path)
+            logger.info("Successfully saved probabilities to {}".format(csv_path))
+
         test_meters.append(test_meter)
         if writer is not None:
             writer.close()
@@ -395,21 +448,32 @@ def test(cfg):
                 view, cfg.TEST.NUM_SPATIAL_CROPS
             )
         )
-        result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
-
-        result_string = (
-            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
-            "".format(
+        if cfg.TEST.NO_LABELS and not cfg.DETECTION.ENABLE:
+            result_string_views += "_{}aNA".format(view)
+            result_string = "_p{:.2f}_f{:.2f}_{}aNA Top5 Acc: NA MEM: {:.2f} f: {:.4f}".format(
                 params / 1e6,
                 flops,
                 view,
-                test_meter.stats["top1_acc"],
-                test_meter.stats["top5_acc"],
                 misc.gpu_mem_usage(),
                 flops,
             )
-        )
+        else:
+            result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
+            result_string = (
+                "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
+                "".format(
+                    params / 1e6,
+                    flops,
+                    view,
+                    test_meter.stats["top1_acc"],
+                    test_meter.stats["top5_acc"],
+                    misc.gpu_mem_usage(),
+                    flops,
+                )
+            )
 
         logger.info("{}".format(result_string))
+    if probs_csv_paths and du.is_root_proc():
+        logger.info("Saved probability CSV files: {}".format(", ".join(probs_csv_paths)))
     logger.info("{}".format(result_string_views))
     return result_string + " \n " + result_string_views
