@@ -349,6 +349,12 @@ _C.TEST.CHECKPOINT_TYPE = "pytorch"
 # Path to saving prediction results file.
 _C.TEST.SAVE_RESULTS_PATH = ""
 
+# If True, run inference without label-based evaluation metrics.
+_C.TEST.NO_LABELS = False
+
+# CSV file (relative to OUTPUT_DIR) for per-class test probabilities.
+_C.TEST.SAVE_PROBS_CSV_PATH = ""
+
 _C.TEST.NUM_TEMPORAL_CLIPS = []
 
 _C.TEST.RETURN_FEATS = False
