@@ -526,6 +526,47 @@ _C.MODEL.HEAD_MLP_DIM = 2048
 
 
 # -----------------------------------------------------------------------------
+# timm backbone options (MODEL.MODEL_NAME = TimmVideoModel)
+# -----------------------------------------------------------------------------
+_C.TIMM = CfgNode()
+
+# Any timm model name, e.g. convnext_tiny, vit_base_patch16_224.
+_C.TIMM.MODEL_NAME = "convnext_tiny"
+
+# Load timm pretrained weights (downloaded on first use).
+_C.TIMM.PRETRAINED = True
+
+# Temporal aggregation over per-frame features: `mean` or `attention`.
+_C.TIMM.TEMPORAL_POOL = "mean"
+
+# Number of heads for the attention temporal pool.
+_C.TIMM.ATTN_POOL_HEADS = 4
+
+# If True, train only the temporal pool and classifier head.
+_C.TIMM.FREEZE_BACKBONE = False
+
+# Stochastic depth rate passed to timm.create_model.
+_C.TIMM.DROP_PATH_RATE = 0.0
+
+
+# -----------------------------------------------------------------------------
+# HuggingFace video model options (MODEL.MODEL_NAME = HFVideoModel)
+# -----------------------------------------------------------------------------
+_C.HF = CfgNode()
+
+# A Hub id for an AutoModelForVideoClassification-compatible model, e.g.
+# MCG-NJU/videomae-base, facebook/timesformer-base-finetuned-k400,
+# google/vivit-b-16x2-kinetics400, facebook/vjepa2-vitl-fpc16-256-ssv2.
+_C.HF.MODEL_NAME = "MCG-NJU/videomae-base"
+
+# Load pretrained weights from the Hub; if False, build from config only.
+_C.HF.PRETRAINED = True
+
+# Enable HF gradient checkpointing to trade compute for memory.
+_C.HF.GRADIENT_CHECKPOINTING = False
+
+
+# -----------------------------------------------------------------------------
 # MViT options
 # -----------------------------------------------------------------------------
 _C.MVIT = CfgNode()
@@ -817,8 +858,10 @@ _C.DATA.TARGET_FPS = 30
 # JITTER TARGET_FPS by +- this number randomly
 _C.DATA.TRAIN_JITTER_FPS = 0.0
 
-# Decoding backend, options include `pyav` or `torchvision`
-_C.DATA.DECODING_BACKEND = "torchvision"
+# Decoding backend, options include `pyav` or `torchvision`. The torchvision
+# backend relies on torchvision's video decoding APIs, which are deprecated
+# since torchvision 0.22 and slated for removal; prefer `pyav`.
+_C.DATA.DECODING_BACKEND = "pyav"
 
 # Decoding resize to short size (set to native size for best speed)
 _C.DATA.DECODING_SHORT_SIZE = 256

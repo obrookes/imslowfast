@@ -6,7 +6,20 @@ import logging as log
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from detectron2.utils.visualizer import Visualizer
+try:
+    # detectron2 is optional: only the visualization/demo paths need it.
+    from detectron2.utils.visualizer import Visualizer
+except ImportError:
+
+    class Visualizer:
+        """Stub base class so this module imports without detectron2."""
+
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(
+                "detectron2 is required for video visualization. Install it "
+                "with: pip install "
+                "'git+https://github.com/facebookresearch/detectron2.git'"
+            )
 
 import slowfast.utils.logging as logging
 from slowfast.utils.misc import get_class_names

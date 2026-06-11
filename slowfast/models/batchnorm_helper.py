@@ -7,7 +7,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from pytorchvideo.layers.batch_norm import (
+from slowfast.vendor.pytorchvideo.batch_norm import (
     NaiveSyncBatchNorm1d,
     NaiveSyncBatchNorm3d,
 )  # noqa

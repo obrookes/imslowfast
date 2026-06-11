@@ -1,0 +1,62 @@
+# Fine-tune V-JEPA 2 ViT-L (facebook/vjepa2-vitl-fpc16-256-ssv2) on species
+# classification. Requires transformers >= 4.53. Processor stats: 16 frames,
+# 256x256, ImageNet mean/std.
+TRAIN:
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 8
+  EVAL_PERIOD: 1
+  CHECKPOINT_PERIOD: 5
+  MIXED_PRECISION: True
+  AUTO_RESUME: True
+TEST:
+  ENABLE: False
+  DATASET: kinetics
+  BATCH_SIZE: 8
+HF:
+  MODEL_NAME: facebook/vjepa2-vitl-fpc16-256-ssv2
+  PRETRAINED: True
+  GRADIENT_CHECKPOINTING: True
+DATA:
+  NUM_FRAMES: 16
+  SAMPLING_RATE: 4
+  TRAIN_JITTER_SCALES: [256, 320]
+  TRAIN_CROP_SIZE: 256
+  TEST_CROP_SIZE: 256
+  INPUT_CHANNEL_NUM: [3]
+  MEAN: [0.485, 0.456, 0.406]
+  STD: [0.229, 0.224, 0.225]
+  PATH_TO_DATA_DIR: /mnt/data/top_priority_annotations/kinetics/disjoint
+  PATH_PREFIX: /mnt/data/top_priority_species
+  SPATIAL_SAMPLING: False
+  TARGET_FPS: 24
+  DECODING_BACKEND: pyav
+AUG:
+  ENABLE: True
+TENSORBOARD:
+  ENABLE: True
+SOLVER:
+  BASE_LR: 1e-4
+  LR_POLICY: cosine
+  MAX_EPOCH: 30
+  WEIGHT_DECAY: 0.05
+  WARMUP_EPOCHS: 3.0
+  WARMUP_START_LR: 1e-6
+  OPTIMIZING_METHOD: adamw
+  BETAS: (0.9, 0.999)
+  ZERO_WD_1D_PARAM: True
+MODEL:
+  NUM_CLASSES: 16
+  MODEL_NAME: HFVideoModel
+  HEAD_ACT: none
+  LOSS_FUNC: cross_entropy
+  DROPOUT_RATE: 0.5
+DATA_LOADER:
+  NUM_WORKERS: 8
+  PIN_MEMORY: True
+NUM_GPUS: 4
+NUM_SHARDS: 1
+USE_SBATCH: False
+RNG_SEED: 0
+LOG_PERIOD: 1
+OUTPUT_DIR: '/mnt/imslowfast/results/species_classification/hf_vjepa2_vitl'

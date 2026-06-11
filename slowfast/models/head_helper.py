@@ -7,7 +7,7 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from detectron2.layers import ROIAlign
+from torchvision.ops import RoIAlign as ROIAlign
 
 import slowfast.utils.logging as logging
 from slowfast.models.attention import MultiScaleBlock

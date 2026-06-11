@@ -130,12 +130,15 @@ def construct_optimizer(model, cfg):
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
     elif cfg.SOLVER.OPTIMIZING_METHOD == "mt_adamw":
-        optimizer = torch.optim._multi_tensor.AdamW(
+        # torch.optim._multi_tensor was removed; foreach=True is the
+        # equivalent multi-tensor implementation.
+        optimizer = torch.optim.AdamW(
             optim_params,
             lr=cfg.SOLVER.BASE_LR,
             betas=cfg.SOLVER.BETAS,
             eps=1e-08,
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+            foreach=True,
         )
     else:
         raise NotImplementedError(
@@ -149,7 +152,19 @@ def construct_optimizer(model, cfg):
 
 
 def get_param_groups(model, cfg):
+    model_without_ddp = model.module if cfg.NUM_GPUS > 1 else model
+    # Wrapper models (e.g. TimmVideoModel) report their own block count;
+    # the native MViT keeps using cfg.MVIT.DEPTH, unchanged.
+    if hasattr(model_without_ddp, "get_num_layers"):
+        depth = model_without_ddp.get_num_layers()
+    else:
+        depth = cfg.MVIT.DEPTH
+
     def _get_layer_decay(name):
+        # Wrapper models expose standard ViT param names (cls_token,
+        # pos_embed, patch_embed, blocks.N) under a "backbone." prefix.
+        if name.startswith("backbone."):
+            name = name[len("backbone.") :]
         layer_id = None
         if name in ("cls_token", "mask_token"):
             layer_id = 0
@@ -160,8 +175,8 @@ def get_param_groups(model, cfg):
         elif name.startswith("blocks"):
             layer_id = int(name.split(".")[1]) + 1
         else:
-            layer_id = cfg.MVIT.DEPTH + 1
-        layer_decay = cfg.SOLVER.LAYER_DECAY ** (cfg.MVIT.DEPTH + 1 - layer_id)
+            layer_id = depth + 1
+        layer_decay = cfg.SOLVER.LAYER_DECAY ** (depth + 1 - layer_id)
         return layer_id, layer_decay
 
     for m in model.modules():

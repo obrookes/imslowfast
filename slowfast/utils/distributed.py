@@ -9,7 +9,7 @@ import pickle
 import torch
 import torch.distributed as dist
 
-from pytorchvideo.layers.distributed import (  # noqa
+from slowfast.vendor.pytorchvideo.distributed import (  # noqa
     cat_all_gather,
     get_local_process_group,
     get_local_rank,

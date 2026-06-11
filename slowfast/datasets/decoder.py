@@ -287,6 +287,9 @@ def pyav_decode_stream(
     return result, max_pts
 
 
+# NOTE: this backend uses torchvision's private _video_opt API, which is
+# deprecated since torchvision 0.22 and slated for removal. Configs should use
+# DATA.DECODING_BACKEND: pyav; this is kept only for legacy reproduction.
 def torchvision_decode(
     video_handle,
     sampling_rate,
@@ -578,15 +581,21 @@ def decode(
             assert (
                 min_delta == -math.inf and max_delta == math.inf
             ), "delta sampling not supported in pyav"
+            assert (
+                num_decode == 1
+            ), "pyav backend supports single-clip decoding only"
+            # pyav_decode takes scalar sampling parameters (the multi-clip
+            # list interface is only implemented by the torchvision backend).
             frames_decoded, fps, decode_all_video = pyav_decode(
                 container,
-                sampling_rate,
-                num_frames,
+                sampling_rate[0],
+                num_frames[0],
                 clip_idx,
                 num_clips_uniform,
                 target_fps,
                 use_offset=use_offset,
             )
+            start_end_delta_time = None
         elif backend == "torchvision":
             (
                 frames_decoded,
@@ -614,8 +623,11 @@ def decode(
         print("Failed to decode by {} with exception: {}".format(backend, e))
         return None, None, None
 
-    # Return None if the frames was not decoded successfully.
-    if frames_decoded is None or None in frames_decoded:
+    # Return None if the frames was not decoded successfully. (The pyav
+    # backend returns a single tensor, for which `None in ...` is invalid.)
+    if frames_decoded is None or (
+        isinstance(frames_decoded, list) and None in frames_decoded
+    ):
         return None, None, None
 
     if not isinstance(frames_decoded, list):
@@ -625,6 +637,12 @@ def decode(
         np.maximum(1.0, sampling_rate[i] * num_frames[i] / target_fps * fps)
         for i in range(len(sampling_rate))
     ]
+
+    # pyav selective decoding does not produce global clip indices; fill them
+    # from the trimmed clip below so callers always receive an array.
+    fill_start_end = start_end_delta_time is None and not decode_all_video
+    if fill_start_end:
+        start_end_delta_time = np.zeros((num_decode, 3))
 
     if decode_all_video:  # full video was decoded (not trimmed yet)
         assert num_decoded == 1 and start_end_delta_time is None
@@ -693,6 +711,8 @@ def decode(
                 start_idx, end_idx, clip_position = get_start_end_idx(
                     frames.shape[0], clip_sizes[k], 0, 1
                 )
+                if fill_start_end:
+                    start_end_delta_time[k] = [start_idx, end_idx, 0.0]
             if augment_vid:
                 frames, time_diff_aug[k] = transform.augment_raw_frames(
                     frames, time_diff_prob, gaussian_prob

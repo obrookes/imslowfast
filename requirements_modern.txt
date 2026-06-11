@@ -1,0 +1,49 @@
+# Modernized environment for imslowfast (verified 2026-06-11).
+#
+# Install with:
+#   pip install -r requirements_modern.txt
+#   pip install -e .  --no-deps
+#
+# CUDA: cu126 wheels run on any NVIDIA driver supporting CUDA 12.x (>=525),
+# which covers the hopper partition (host has module cuda/12.3). Do NOT switch
+# to cu130 wheels without confirming the cluster driver is >=580.
+
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.10.*
+torchvision==0.25.*
+
+# Video decoding. PyAV wheels bundle FFmpeg, so no system/conda ffmpeg needed.
+# The decode path (seek/decode/to_rgb/to_ndarray/thread_type) is verified
+# compatible through av 17.x; fall back to 14.x-16.x if decode smoke fails.
+av==17.1.0
+
+# numpy 1.26.4 is the last 1.x line; supports Python <=3.12. A numpy 2.x trial
+# is a scheduled follow-up (see plan); do not bump casually.
+numpy==1.26.4
+
+# Config / registry system. This exact PyPI release is what the legacy
+# working env used (slowfast_env.yml) — proven with this codebase. fvcore is
+# pure Python; if it ever breaks on a new Python, switch to
+# git+https://github.com/facebookresearch/fvcore (pin the commit you get).
+fvcore==0.1.5.post20221221
+iopath>=0.1.9
+yacs>=0.1.8
+pyyaml>=5.1
+
+# Model libraries.
+timm>=1.0.15
+transformers>=4.53,<5  # v4 LTS branch. Do NOT use v5: weekly breaking changes,
+                       # dtype-loading change in from_pretrained.
+
+# Everything else.
+opencv-python
+pandas
+scikit-learn
+tensorboard
+matplotlib
+simplejson
+termcolor>=1.1
+tqdm
+psutil
+pytorch-multilabel-balanced-sampler==0.1.3

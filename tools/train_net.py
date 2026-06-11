@@ -207,7 +207,7 @@ def train_epoch(
             samples, labels = mixup_fn(inputs[0], labels)
             inputs[0] = samples
 
-        with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
+        with torch.amp.autocast("cuda", enabled=cfg.TRAIN.MIXED_PRECISION):
             # Explicitly declare reduction to mean.
             perform_backward = True
             optimizer.zero_grad()
@@ -854,7 +854,7 @@ def train(cfg):
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
     # Create a GradScaler for mixed precision training
-    scaler = torch.cuda.amp.GradScaler(enabled=cfg.TRAIN.MIXED_PRECISION)
+    scaler = torch.amp.GradScaler("cuda", enabled=cfg.TRAIN.MIXED_PRECISION)
 
     # Load a checkpoint to resume training if applicable.
     if cfg.TRAIN.AUTO_RESUME and cu.has_checkpoint(cfg.OUTPUT_DIR):

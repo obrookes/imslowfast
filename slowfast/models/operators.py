@@ -9,7 +9,7 @@ import warnings
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorchvideo.layers.swish import Swish
+from slowfast.vendor.pytorchvideo.swish import Swish
 
 from slowfast.models.utils import get_gkern
 
