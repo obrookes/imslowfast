@@ -346,8 +346,10 @@ def test(cfg):
         cu.load_test_checkpoint(cfg, model)
 
         # Load the checkpoint on CPU to avoid GPU mem spike.
+        # weights_only=False: trusted local checkpoint with non-tensor payloads
+        # (cfg dump, optimizer state); required since torch 2.6.
         with pathmgr.open(cfg.TEST.CHECKPOINT_FILE_PATH, "rb") as f:
-            checkpoint = torch.load(f, map_location="cpu")
+            checkpoint = torch.load(f, map_location="cpu", weights_only=False)
 
         # Create video testing loaders.
         test_loader = loader.construct_loader(cfg, "test")

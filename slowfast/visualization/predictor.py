@@ -4,9 +4,15 @@
 import queue
 import cv2
 import torch
-from detectron2 import model_zoo
-from detectron2.config import get_cfg
-from detectron2.engine import DefaultPredictor
+try:
+    # detectron2 is optional: only the demo person-detector path needs it.
+    from detectron2 import model_zoo
+    from detectron2.config import get_cfg
+    from detectron2.engine import DefaultPredictor
+
+    _HAS_DETECTRON2 = True
+except ImportError:
+    _HAS_DETECTRON2 = False
 
 import slowfast.utils.checkpoint as cu
 from slowfast.datasets import cv2_transform
@@ -168,6 +174,12 @@ class Detectron2Predictor:
                 slowfast/config/defaults.py
             gpu_id (Optional[int]): GPU id.
         """
+        if not _HAS_DETECTRON2:
+            raise RuntimeError(
+                "detectron2 is required for the demo person detector "
+                "(DEMO.ENABLE with DEMO.PREDS_BOXES unset). Install it with: "
+                "pip install 'git+https://github.com/facebookresearch/detectron2.git'"
+            )
 
         self.cfg = get_cfg()
         self.cfg.merge_from_file(

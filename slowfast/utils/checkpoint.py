@@ -294,8 +294,11 @@ def load_checkpoint(
         epoch = -1
     else:
         # Load the checkpoint on CPU to avoid GPU mem spike.
+        # weights_only=False: checkpoints are trusted local files and contain
+        # non-tensor payloads (cfg dump, optimizer state), which the
+        # weights_only default introduced in torch 2.6 would reject.
         with pathmgr.open(path_to_checkpoint, "rb") as f:
-            checkpoint = torch.load(f, map_location="cpu")
+            checkpoint = torch.load(f, map_location="cpu", weights_only=False)
         model_state_dict_3d = (
             model.module.state_dict() if data_parallel else model.state_dict()
         )
