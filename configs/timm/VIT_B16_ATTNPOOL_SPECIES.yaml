@@ -1,0 +1,65 @@
+# Species classification with a timm ViT-B/16 backbone: frames encoded
+# independently, attention-pooled over time, with layer-wise lr decay
+# (exercises the generalized layer-decay path; ViT exposes blocks.N names).
+TRAIN:
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 16
+  EVAL_PERIOD: 1
+  CHECKPOINT_PERIOD: 5
+  MIXED_PRECISION: True
+  AUTO_RESUME: True
+TEST:
+  ENABLE: False
+  DATASET: kinetics
+  BATCH_SIZE: 16
+TIMM:
+  MODEL_NAME: vit_base_patch16_224
+  PRETRAINED: True
+  TEMPORAL_POOL: attention
+  ATTN_POOL_HEADS: 4
+  DROP_PATH_RATE: 0.1
+DATA:
+  NUM_FRAMES: 16
+  SAMPLING_RATE: 24
+  TRAIN_JITTER_SCALES: [224, 288]
+  TRAIN_CROP_SIZE: 224
+  TEST_CROP_SIZE: 224
+  INPUT_CHANNEL_NUM: [3]
+  MEAN: [0.5, 0.5, 0.5]
+  STD: [0.5, 0.5, 0.5]
+  PATH_TO_DATA_DIR: /mnt/data/top_priority_annotations/kinetics/disjoint
+  PATH_PREFIX: /mnt/data/top_priority_species
+  SPATIAL_SAMPLING: False
+  TARGET_FPS: 24
+  DECODING_BACKEND: pyav
+AUG:
+  ENABLE: True
+TENSORBOARD:
+  ENABLE: True
+SOLVER:
+  BASE_LR: 1e-4
+  LR_POLICY: cosine
+  MAX_EPOCH: 30
+  WEIGHT_DECAY: 0.05
+  WARMUP_EPOCHS: 3.0
+  WARMUP_START_LR: 1e-6
+  OPTIMIZING_METHOD: adamw
+  BETAS: (0.9, 0.999)
+  LAYER_DECAY: 0.75
+  ZERO_WD_1D_PARAM: True
+MODEL:
+  NUM_CLASSES: 16
+  MODEL_NAME: TimmVideoModel
+  HEAD_ACT: none
+  LOSS_FUNC: cross_entropy
+  DROPOUT_RATE: 0.5
+DATA_LOADER:
+  NUM_WORKERS: 8
+  PIN_MEMORY: True
+NUM_GPUS: 4
+NUM_SHARDS: 1
+USE_SBATCH: False
+RNG_SEED: 0
+LOG_PERIOD: 1
+OUTPUT_DIR: '/mnt/imslowfast/results/species_classification/timm_vit_b16'

@@ -16,4 +16,18 @@ try:
         PTVSlowFast,
     )  # noqa
 except Exception:
-    print("Please update your PyTorchVideo to latest master")
+    # pytorchvideo is no longer a dependency; the PTV* wrapper models are
+    # unavailable unless it is installed separately.
+    pass
+
+try:
+    from .timm_model_builder import TimmVideoModel  # noqa
+except ImportError:
+    # timm not installed (e.g. legacy environment).
+    pass
+
+try:
+    from .hf_model_builder import HFVideoModel  # noqa
+except ImportError:
+    # transformers not installed (e.g. legacy environment).
+    pass
