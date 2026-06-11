@@ -7,7 +7,7 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from pytorchvideo.losses.soft_target_cross_entropy import (
+from slowfast.vendor.pytorchvideo.soft_target_cross_entropy import (
     SoftTargetCrossEntropyLoss,
 )
 

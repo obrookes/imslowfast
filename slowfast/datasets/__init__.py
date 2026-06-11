@@ -15,4 +15,6 @@ from .ssv2 import Ssv2  # noqa
 try:
     from .ptv_datasets import Ptvcharades, Ptvkinetics, Ptvssv2  # noqa
 except Exception:
-    print("Please update your PyTorchVideo to latest master")
+    # pytorchvideo is no longer a dependency; the Ptv* datasets are
+    # unavailable unless it is installed separately.
+    pass
