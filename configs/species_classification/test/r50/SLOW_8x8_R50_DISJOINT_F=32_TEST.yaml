@@ -12,8 +12,8 @@ TRAIN:
 TEST:
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 168
-  CHECKPOINT_FILE_PATH: /mnt/imslowfast/results/species_classification/disjoint_f=32/checkpoints/checkpoint_epoch_00048.pyth
+  BATCH_SIZE: 96
+  CHECKPOINT_FILE_PATH: /mnt/slowfast/imslowfast/results/species_classification/disjoint_f=32/tps_disjoint_epoch=48.pyth
   CHECKPOINT_TYPE: pytorch
   RETURN_FEATS: True
   NUM_ENSEMBLE_VIEWS: 1
@@ -25,8 +25,8 @@ DATA:
   TRAIN_CROP_SIZE: 256
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /mnt/data/top_priority_annotations/kinetics/disjoint
-  PATH_PREFIX: /mnt/data/top_priority_species
+  PATH_TO_DATA_DIR: /mnt/data/annotations/pss_p3_slowfast
+  PATH_PREFIX: /mnt/data/videos
   SPATIAL_SAMPLING: False
   TARGET_FPS: 24
 AUG:
@@ -67,9 +67,9 @@ MODEL:
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
-NUM_GPUS: 4
+NUM_GPUS: 1
 NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: '/mnt/imslowfast/results/species_classification/disjoint_f=32_test'
+OUTPUT_DIR: '/mnt/slowfast/imslowfast/results/species_classification/disjoint_f=32_pss-p3_test'

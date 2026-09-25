@@ -4,7 +4,7 @@ TRAIN:
   BATCH_SIZE: 168
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 5
-  CHECKPOINT_FILE_PATH: /mnt/imslowfast/weights/R50_IN1K.pyth
+  # CHECKPOINT_FILE_PATH: /mnt/imslowfast/weights/R50_IN1K.pyth
   CHECKPOINT_TYPE: pytorch
   CHECKPOINT_INFLATE: True
   MIXED_PRECISION: True
@@ -13,7 +13,7 @@ TEST:
   ENABLE: True
   DATASET: kinetics
   BATCH_SIZE: 64 
-  CHECKPOINT_FILE_PATH: /mnt/imslowfast/results/species_classification/3dr50_disjoint_f=32/checkpoints/checkpoint_epoch_00048.pyth
+  # CHECKPOINT_FILE_PATH: /mnt/imslowfast/results/species_classification/3dr50_disjoint_f=32/checkpoints/checkpoint_epoch_00048.pyth
   CHECKPOINT_TYPE: pytorch
   RETURN_FEATS: True
   NUM_ENSEMBLE_VIEWS: 1
@@ -73,4 +73,4 @@ NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: '/mnt/imslowfast/results/species_classification/3dr50_trn=disjoint_tst=offset_f=32'
+OUTPUT_DIR: '/mnt/slowfast/imslowfast/results/species_classification/3dr50_trn=disjoint_tst=offset_f=32'

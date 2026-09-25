@@ -12,13 +12,13 @@ TRAIN:
 TEST:
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 96
-  CHECKPOINT_FILE_PATH: results/species_classification/disjoint_f=32/tps_disjoint_epoch=48.pyth
+  BATCH_SIZE: 64
+  CHECKPOINT_FILE_PATH: results/species_classification/overlapping_f=32/tps_overlapping_epoch=48.pyth
   CHECKPOINT_TYPE: pytorch
   NUM_ENSEMBLE_VIEWS: 1
   NUM_SPATIAL_CROPS: 1
   NO_LABELS: True
-  SAVE_PROBS_CSV_PATH: pss-p3_disjoint_probs.csv
+  SAVE_PROBS_CSV_PATH: pss-p3_overlapping_probs.csv
 DATA:
   NUM_FRAMES: 32
   SAMPLING_RATE: 24
@@ -73,4 +73,4 @@ NUM_SHARDS: 1
 USE_SBATCH: False
 RNG_SEED: 0
 LOG_PERIOD: 1
-OUTPUT_DIR: 'results/species_classification/pss-p3_disjoint_f=32'
+OUTPUT_DIR: 'results/species_classification/pss-p3_overlapping_f=32'
